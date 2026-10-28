@@ -1,4 +1,4 @@
-# @mamun/prisma-query-builder
+# @almamun2b/prisma-query-builder
 
 > Zero-coupling, fluent, fully type-safe query builder for any Prisma model delegate.
 > **Status: v0.1.0 — scaffold complete, core API working. See [PLAN.md](./PLAN.md).**
@@ -42,7 +42,7 @@ const { meta, data } = await new QueryBuilder(prisma.user)
 ## Dialect configuration
 
 ```ts
-import { configureQueryBuilder } from '@mamun/prisma-query-builder';
+import { configureQueryBuilder } from '@almamun2b/prisma-query-builder';
 
 configureQueryBuilder({ dialect: 'postgres' });           // global default
 new QueryBuilder(prisma.user, { dialect: 'mysql' });      // per-builder override
@@ -61,4 +61,4 @@ npm test         # 42 unit tests (fake delegates, zero Prisma required)
 - `test/types` — compile-time projection tests (run by `npm run typecheck`)
 - `builder/` — the original prototype this package was extracted from (reference only)
 
-> **Note:** the npm scope `@mamun/` is a placeholder — finalize before first publish (PLAN.md M4).
+> **Note:** the npm scope `@almamun2b/` is live on npm.

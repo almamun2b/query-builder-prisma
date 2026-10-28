@@ -1,12 +1,12 @@
 {
-  "name": "@mamun/prisma-query-builder",
+  "name": "@almamun2b/prisma-query-builder",
   "version": "0.1.0",
   "description": "Zero-coupling, fluent, fully type-safe query builder for any Prisma model delegate. Works with every Prisma version (5+, by design all versions) and every database Prisma supports.",
   "license": "MIT",
   "author": "Mamun",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mamun/prisma-query-builder.git"
+    "url": "git+https://github.com/almamun2b/prisma-query-builder.git"
   },
   "keywords": [
     "prisma",

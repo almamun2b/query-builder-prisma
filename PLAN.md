@@ -1,9 +1,9 @@
-# PLAN — `@mamun/prisma-query-builder`
+# PLAN — `@almamun2b/prisma-query-builder`
 
 > A zero-coupling, fluent, fully type-safe query builder for Prisma that works with
 > **every Prisma version (5, 6, 7, 8, and future ones)** and **every database Prisma supports**.
 >
-> Status: v0 — base project scaffold. Package name scope `@mamun/` is a placeholder;
+> Status: v0 — base project scaffold. Package name scope `@almamun2b/` is a placeholder;
 > change it in `package.json` + `PLAN.md` before first publish.
 
 ---
