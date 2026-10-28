@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    strategy:
+      matrix:
+        node: [18, 20, 24]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # M3 (see PLAN.md §6): version × database integration matrix.
+  # Test apps pinned to prisma@5/6/7/8-rc × postgres/mysql/sqlite/mongodb,
+  # plus a nightly canary job against prisma@dev to catch future breakage early.

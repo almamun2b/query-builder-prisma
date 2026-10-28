@@ -1,0 +1,61 @@
+{
+  "name": "@mamun/prisma-query-builder",
+  "version": "0.1.0",
+  "description": "Zero-coupling, fluent, fully type-safe query builder for any Prisma model delegate. Works with every Prisma version (5+, by design all versions) and every database Prisma supports.",
+  "license": "MIT",
+  "author": "Mamun",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mamun/prisma-query-builder.git"
+  },
+  "keywords": [
+    "prisma",
+    "query-builder",
+    "querybuilder",
+    "pagination",
+    "cursor-pagination",
+    "typescript",
+    "orm"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run verify"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  }
+}
