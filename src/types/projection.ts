@@ -1,5 +1,5 @@
 /**
- * Structural projection engine (PLAN.md §2 Rule 3).
+ * Structural projection engine (ARCHITECTURE.md, invariant 3).
  *
  * Narrows the output type of `findMany` according to the accumulated
  * `select`/`include` arguments — without importing a single Prisma type.
@@ -37,18 +37,33 @@ type ProjectField<Field, Spec> = Spec extends true
   : Spec extends { select: infer Sub }
     ? ProjectNested<Field, Sub>
     : Spec extends { include: infer Sub }
-      ? ProjectNested<Field, Sub>
+      ? ProjectNestedInclude<Field, Sub>
       : Field;
 
 /**
- * Project a relation field. Lists map over their element; optionality
- * (`| null | undefined`) is preserved exactly.
+ * Project a relation field through a `select`. Only the selected keys remain.
+ * Lists map over their element; optionality (`| null | undefined`) is preserved
+ * exactly.
  */
 type ProjectNested<Field, Sub> =
   Field extends readonly (infer E)[]
     ? ApplySelect<E, Sub>[]
     :
         | ApplySelect<NonNullable<Field>, Sub>
+        | (undefined extends Field ? undefined : never)
+        | (null extends Field ? null : never);
+
+/**
+ * Project a relation field through an `include`. Unlike select, include keeps
+ * the relation's own fields — the element is intersected with its projection
+ * via `ApplyInclude` (audit F3). Lists map over their element; optionality is
+ * preserved exactly.
+ */
+type ProjectNestedInclude<Field, Sub> =
+  Field extends readonly (infer E)[]
+    ? ApplyInclude<E, Sub>[]
+    :
+        | ApplyInclude<NonNullable<Field>, Sub>
         | (undefined extends Field ? undefined : never)
         | (null extends Field ? null : never);
 

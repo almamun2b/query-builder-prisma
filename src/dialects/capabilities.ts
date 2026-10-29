@@ -1,5 +1,5 @@
 /**
- * Per-database capability sets (PLAN.md §2 Rule 4).
+ * Per-database capability sets (ARCHITECTURE.md, invariant 4).
  *
  * Prisma-supported databases disagree on filter operators — most importantly,
  * `mode: 'insensitive'` is only accepted on PostgreSQL, CockroachDB and MongoDB,

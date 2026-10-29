@@ -8,6 +8,10 @@
     "type": "git",
     "url": "git+https://github.com/almamun2b/prisma-query-builder.git"
   },
+  "homepage": "https://github.com/almamun2b/prisma-query-builder#readme",
+  "bugs": {
+    "url": "https://github.com/almamun2b/prisma-query-builder/issues"
+  },
   "keywords": [
     "prisma",
     "query-builder",

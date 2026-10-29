@@ -2,7 +2,7 @@ import { DIALECT_CAPABILITIES } from './capabilities';
 import type { DialectCapabilities } from './capabilities';
 
 /*
- * Dialect registry (PLAN.md section 2, Rule 4).
+ * Dialect registry (ARCHITECTURE.md, invariant 4).
  *
  * Resolution order (fails soft to 'universal', which is always valid):
  *   1. explicit per-builder override  new QueryBuilder(prisma.user, { dialect: 'mysql' })

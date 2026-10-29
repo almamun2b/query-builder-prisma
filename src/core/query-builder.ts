@@ -50,7 +50,7 @@ export class NoResultError extends Error {
 
 /**
  * Generic, reusable and fully type-safe query builder for any Prisma model
- * delegate, on every Prisma version (see PLAN.md).
+ * delegate, on every Prisma version (see ARCHITECTURE.md).
  *
  * All option types (`where`, `select`, `include`, `orderBy`, ...) are inferred
  * structurally from the delegate passed to the constructor — nothing is imported
@@ -77,6 +77,12 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   private readonly dialect: Dialect | undefined;
   private readonly andConditions: object[] = [];
   private customArgs: Record<string, unknown> = {};
+  /**
+   * The `initialArgs` seed `where` plus every `.custom({ where })`, AND-merged.
+   * Kept out of `customArgs` so a later `.custom({ where })` merges with the
+   * seed instead of replacing it (audit F2 — the seed carries safety filters).
+   */
+  private customWhere: unknown;
   private orderBy: object | undefined;
   private selectArg: object | undefined;
   private includeArg: object | undefined;
@@ -96,7 +102,9 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     this.delegate = delegate;
     this.dialect = options?.dialect;
     if (options?.initialArgs) {
-      this.customArgs = { ...(options.initialArgs as object) };
+      const { where, ...rest } = options.initialArgs as Record<string, unknown>;
+      this.customArgs = { ...rest };
+      this.customWhere = where;
     }
   }
 
@@ -104,10 +112,11 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * Case-insensitive `contains` across the provided string fields. No condition
    * is added when `searchText` is empty.
    *
-   * Dialect-aware: adds `mode: 'insensitive'` only where Prisma accepts it
-   * (postgresql, cockroachdb, mongodb). On mysql/mariadb/sqlserver the bare
-   * `contains` relies on the database's collation; on sqlite matching is
-   * case-sensitive for ASCII (Prisma offers no alternative there).
+   * Dialect-aware: adds `mode: 'insensitive'` only where Prisma accepts it (see
+   * `caseInsensitiveMode` in `src/dialects/capabilities.ts`); everywhere else
+   * the bare `contains` relies on the database's collation, and where that is
+   * ASCII-only matching stays case-sensitive — Prisma offers no alternative
+   * there.
    */
   search(params: { searchText?: string | undefined; fields: WhereKeyOf<D>[] }): this {
     const { searchText, fields } = params;
@@ -236,9 +245,18 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     >;
   }
 
-  /** Merges raw `findMany` args, e.g. `cursor`, `distinct` or a custom `where`. */
+  /**
+   * Merges raw `findMany` args, e.g. `cursor`, `distinct` or a custom `where`.
+   * A custom `where` is AND-ed with the `initialArgs` seed and any previous
+   * custom `where` — it never replaces them (audit F2). Successive custom
+   * `where`s may nest `{ AND: [...] }` groups; Prisma treats that identically.
+   */
   custom(args: FindManyArgsOf<D>): this {
-    this.customArgs = { ...this.customArgs, ...(args as object) };
+    const { where, ...rest } = args as Record<string, unknown>;
+    this.customArgs = { ...this.customArgs, ...rest };
+    if (where !== undefined) {
+      this.customWhere = combineAnd([where as object], this.customWhere);
+    }
     return this;
   }
 
@@ -334,9 +352,19 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * When no pagination was configured, defaults to page 1, limit 10 so `meta`
    * always describes the data actually returned. `count` and `findMany` run in
    * parallel.
+   *
+   * Throws when cursor pagination is configured — offset meta cannot describe a
+   * seek query, and the cursor over-fetch row would leak into `data` (audit F1).
+   * Use {@link executeWithCursor} instead.
    */
   async executeWithMeta(): Promise<{ meta: PaginationMeta; data: FindResultOf<D, TArgs> }> {
-    if (!this.cursorActive && this.limit === undefined) {
+    if (this.cursorActive) {
+      throw new Error(
+        'executeWithMeta() is offset-mode only: this builder has cursor pagination ' +
+          'configured via cursorPaginate(). Use executeWithCursor() instead.',
+      );
+    }
+    if (this.limit === undefined) {
       this.paginate({ page: 1, limit: DEFAULT_PAGE_SIZE });
     }
     const offset = toOffsetArgs(this.page ?? 1, this.limit ?? DEFAULT_PAGE_SIZE);
@@ -377,6 +405,6 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   }
 
   private buildWhere(): object | undefined {
-    return combineAnd(this.andConditions, this.customArgs.where);
+    return combineAnd(this.andConditions, this.customWhere);
   }
 }

@@ -1,7 +1,7 @@
 import type { Dialect } from './capabilities';
 
 /**
- * Best-effort dialect auto-detection (M2 scope, see PLAN.md §6).
+ * Best-effort dialect auto-detection (M2 scope).
  *
  * v0 intentionally detects nothing and returns `undefined` → callers fall
  * through to `'universal'`, which never emits an invalid argument on any

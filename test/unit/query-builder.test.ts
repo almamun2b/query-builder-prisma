@@ -55,6 +55,46 @@ describe('QueryBuilder conditions', () => {
   });
 });
 
+describe('QueryBuilder custom where merge (audit F2)', () => {
+  it('custom where is ANDed with the initialArgs seed, never replaces it', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate, { initialArgs: { where: { deletedAt: null } } })
+      .custom({ where: { role: 'ADMIN' } })
+      .execute();
+    expect(recorded.findManyArgs?.where).toEqual({
+      AND: [{ deletedAt: null }, { role: 'ADMIN' }],
+    });
+  });
+
+  it('custom where without a seed stays unwrapped', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate).custom({ where: { role: 'ADMIN' } }).execute();
+    expect(recorded.findManyArgs?.where).toEqual({ role: 'ADMIN' });
+  });
+
+  it('successive custom wheres AND together', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate)
+      .custom({ where: { role: 'ADMIN' } })
+      .custom({ where: { status: 'ACTIVE' } })
+      .execute();
+    expect(recorded.findManyArgs?.where).toEqual({
+      AND: [{ role: 'ADMIN' }, { status: 'ACTIVE' }],
+    });
+  });
+
+  it('seed survives when custom also carries other args', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate, { initialArgs: { where: { deletedAt: null } } })
+      .custom({ distinct: ['email'], where: { role: 'ADMIN' } })
+      .execute();
+    expect(recorded.findManyArgs?.distinct).toEqual(['email']);
+    expect(recorded.findManyArgs?.where).toEqual({
+      AND: [{ deletedAt: null }, { role: 'ADMIN' }],
+    });
+  });
+});
+
 describe('QueryBuilder offset pagination', () => {
   it('paginate computes skip/take', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(20));
@@ -84,6 +124,15 @@ describe('QueryBuilder offset pagination', () => {
     const { meta, data } = await new QueryBuilder(delegate).executeWithMeta();
     expect(meta).toEqual({ page: 1, limit: 10, total: 40, totalPage: 4 });
     expect(data).toHaveLength(10);
+  });
+
+  it('executeWithMeta throws under cursor mode and never calls the delegate (audit F1)', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(5));
+    await expect(
+      new QueryBuilder(delegate).cursorPaginate({ limit: 3 }).executeWithMeta(),
+    ).rejects.toThrow('executeWithMeta() is offset-mode only');
+    expect(recorded.findManyArgs).toBeUndefined();
+    expect(recorded.countArgs).toBeUndefined();
   });
 });
 

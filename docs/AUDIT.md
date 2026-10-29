@@ -1,19 +1,20 @@
 # Consolidated Audit — `@almamun2b/prisma-query-builder` v0.1.0
 
 - **Date:** 2026-10-29 (merged from two independent audits: `AUDIT.md` A-series + `audit-2026-10-29.md` B/G-series)
+- **Updated:** 2026-10-29 (same day) — the three P0/HIGH findings (F1, F2, F3) are fixed with the regression tests this register asks for. **Internal register:** lives in `docs/` and is deliberately not referenced from any other doc; the user-facing subset of open limitations is mirrored in the README `Known limitations` section.
 - **Scope:** all of `src/`, `test/`, packaging, config, CI, docs; framework compatibility (Next.js / Express / Node / NestJS / edge).
 - **Method:** static review of every source file (ground truth from disk), runtime probes against built `dist/` (ESM + CJS), TypeScript consumer fixtures (`nodenext`, `exactOptionalPropertyTypes`), targeted type probes. Findings marked `[probe]` were confirmed by a runnable experiment; findings from the second audit were **re-verified here** where noted.
 - **Baseline:** `npm run verify` green (lint, typecheck, 42/42 tests, dual build).
 
-**Verdict:** architecture is sound and the zero-coupling rule holds (structural types, dialect registry, dual build all correct). But there are **3 high-severity bugs** — cursor/offset meta conflict with a leaked over-fetch row, a soft-delete seed that can be silently replaced (data leak), and a projection type that lies for nested `include` — plus several medium footguns. Nothing blocks development; fix P0 before any release announcement.
+**Verdict:** architecture is sound and the zero-coupling rule holds (structural types, dialect registry, dual build all correct). The review found **3 high-severity bugs** — cursor/offset meta conflict with a leaked over-fetch row, a soft-delete seed that can be silently replaced (data leak), and a projection type that lies for nested `include` — plus several medium footguns. **All three HIGH findings are fixed as of 2026-10-29** (see the rows for fix + regression tests); the P1 mediums remain open. Nothing blocks development.
 
 ## Severity summary
 
 | ID | Sev | Area | Finding (source) |
 |----|-----|------|------------------|
-| F1 | HIGH | pagination | `executeWithMeta()` × `cursorPaginate()`: fabricated meta **and** over-fetched row leaked to caller (A1 + B1) `[probe]` |
-| F2 | HIGH | API | `.custom({ where })` silently **replaces** seeded `initialArgs.where` → soft-delete filters lost (B2) `[probe]` |
-| F3 | HIGH | types | nested `include` drops the relation's base fields from the type — narrower than runtime truth (B3) |
+| F1 | HIGH | pagination | `executeWithMeta()` × `cursorPaginate()`: fabricated meta **and** over-fetched row leaked to caller (A1 + B1) `[probe]` — **FIXED 2026-10-29** |
+| F2 | HIGH | API | `.custom({ where })` silently **replaces** seeded `initialArgs.where` → soft-delete filters lost (B2) `[probe]` — **FIXED 2026-10-29** |
+| F3 | HIGH | types | nested `include` drops the relation's base fields from the type — narrower than runtime truth (B3) — **FIXED 2026-10-29** |
 | F4 | MED | pagination | Date `cursorField` coerced with `String()` → locale/TZ-dependent, non-round-trippable cursors (B4) |
 | F5 | MED | pagination | `.select()` without `cursorField` yields literal `"undefined"` cursor (B5) |
 | F6 | MED | API | `sortBy()` does not expand dot paths → invalid `orderBy` for relation fields (B6) `[probe]` |
@@ -29,6 +30,7 @@
 | F16 | LOW | security | `__proto__`-keyed input sets a local prototype (contained; hardening recommended) (A10) |
 | F17 | LOW | types | `FindResultOf` duplicates `RowElementOf` extraction (Promise-only) (A11) |
 | F18 | LOW | perf | offset `skip` unbounded: `page: 1e9 × limit 1000` → `skip ≈ 1e12` hits the DB (B§4) |
+| F19 | MED | pagination | plain `.execute()` after `.cursorPaginate()` returns raw seek-order rows including the one-row over-fetch (untrimmed — `buildCursorPage` only runs in `executeWithCursor`); surfaced by the 2026-10-29 review, documented in README `Known limitations` |
 
 Old-ID map: A1→F1, A2→F9, A3/A4→F11, A5→F10, A6→F12, A7→F13, A8→F14, A9→F15 (+G10), A10→F16, A11→F17, A12→F7, A13→F8, B1→F1, B2→F2, B3→F3, B4→F4, B5→F5, B6→F6.
 
@@ -44,15 +46,21 @@ The guard `!this.cursorActive` only skips the *default* paginate; the method the
 
 **Fix:** throw a descriptive error when `cursorActive` ("use `executeWithCursor()` for cursor pagination; `executeWithMeta()` is offset-mode only"), or delegate to `buildCursorPage()` and return cursor-aware meta. The `count()` call is unused work in cursor mode — it falls out of the fix.
 
+**Fixed (2026-10-29):** `executeWithMeta()` now throws a descriptive error at the top of the method when `cursorActive` (the audit's preferred option); the unused `COUNT` fell out of the fix, and the delegate is never called in cursor mode. Regression test: *"executeWithMeta throws under cursor mode and never calls the delegate (audit F1)"* in `test/unit/query-builder.test.ts`.
+
 ### F2 — HIGH · `.custom({ where })` replaces the seeded `where` (soft-delete leak) `[probe]`
 **Where:** `constructor` (L98–100) copies `initialArgs` into `customArgs`; `custom()` (L240–243) flat-spreads. A later `.custom({ where: X })` **overwrites** the seed instead of AND-ing.
 The seed is where users put safety filters (`{ deletedAt: null }`), so this silently leaks soft-deleted rows. Re-verified in the consolidated pass: sent `where` was `{"role":"ADMIN"}` with the seed gone.
 **Fix:** special-case `where` in `custom()` — merge through the same `combineAnd()` logic as `buildWhere()`. Regression test: seed survives `.custom({ where })`.
 
+**Fixed (2026-10-29):** the seed `where` moved out of `customArgs` into a dedicated `customWhere` field; `custom()` merges through `combineAnd()`, so the seed and successive custom `where`s are AND-ed, never replaced (successive merges may nest `{ AND: [...] }` groups — semantically identical in Prisma). Regression tests: *"QueryBuilder custom where merge (audit F2)"* block (4 cases: seed survival, no-seed passthrough, successive custom wheres, seed + other custom keys) in `test/unit/query-builder.test.ts`.
+
 ### F3 — HIGH · nested `include` types drop the relation's base fields
 **Where:** `src/types/projection.ts` `ProjectField` (L35–41) routes `Spec extends { include: Sub }` into `ProjectNested` → `ApplySelect`, which emits **only** the projected keys.
-Prisma's real result for `.include({ author: { include: { posts: true } } })` is `Post & { author: Author & { posts: Post[] } }`; our engine types it as `Post & { author: { posts: Post[] } }` — `author.id`/`author.name` vanish from the type while present at runtime. This is a **narrower-than-truth type**, violating PLAN.md Rule 3 ("never lie"). The existing type tests cover nested *select* but never nested *include* — that's how it slipped through.
+Prisma's real result for `.include({ author: { include: { posts: true } } })` is `Post & { author: Author & { posts: Post[] } }`; our engine types it as `Post & { author: { posts: Post[] } }` — `author.id`/`author.name` vanish from the type while present at runtime. This is a **narrower-than-truth type**, violating the type invariant (ARCHITECTURE.md invariant 3, "never lie"). The existing type tests cover nested *select* but never nested *include* — that's how it slipped through.
 **Fix:** `ProjectNested` must know the spec origin: add an include-branch that maps `Field extends readonly (infer E)[] ? ApplyInclude<E, Sub>[] : ApplyInclude<NonNullable<Field>, Sub> | null/undefined-preserved`. Add the nested-include `Expect<Equal>` type test.
+
+**Fixed (2026-10-29):** `ProjectNestedInclude` added to `src/types/projection.ts` — an include spec now maps onto `ApplyInclude`, intersecting the relation's own base fields into the nested projection exactly like Prisma's output, with `| null | undefined` optionality preserved. Regression tests: `_7`–`_10` strict `Expect<Equal>` assertions in `test/types/projection.type-test.ts` (nested include, nested include + inner select, nullable nested include, flat nullable-include guard).
 
 ### F4 — MED · Date `cursorField` → lossy `String()` coercion
 **Where:** `src/core/pagination.ts` `buildCursorPage()` (L114–115). `String(dateValue)` produces locale strings like `"Thu Jan 01 2026 06:00:09 GMT+0600"` — not ISO, not round-trippable, TZ-dependent (code-verified; the probe path requires a non-null `nextCursor`). Number fields survive only by luck.
@@ -112,9 +120,9 @@ Computed-key literals (`{ [key]: value }`) are safe (own properties). `stripUnde
 
 | ID | Gap | Note |
 |----|-----|------|
-| G1 | No multi-key / array `orderBy` | promised in PLAN.md §4 M1; `sortBy()` is single-key |
+| G1 | No multi-key / array `orderBy` | promised for the core milestone; `sortBy()` is single-key |
 | G2 | `detectDialect()` is dead code | exported but never wired into `resolveDialect()`; wire it or hide from the public API until M2 |
-| G3 | No `includeTotal: false` fast path | promised PLAN.md §4; every `executeWithMeta()` pays a `COUNT` |
+| G3 | No `includeTotal: false` fast path | promised; every `executeWithMeta()` pays a `COUNT` |
 | G4 | Cursor pagination doesn't enforce/auto-add `sortBy({ sortBy: cursorField })` | without it pages are unstable; only JSDoc warns |
 | G5 | `.first()` deletes `skip` | `.paginate({ page: 3 }).first()` returns the global first row — intended but undocumented; pin the semantics |
 | G6 | `range()` dot paths on to-many relations generate invalid where | `'posts.likes'` expands to `{ posts: { likes } }` but Prisma needs `{ posts: { some: { likes } } }`; works for to-one only — document (or `some:` path syntax in v2) |
@@ -122,10 +130,10 @@ Computed-key literals (`{ [key]: value }`) are safe (own properties). `stripUnde
 | G8 | Unknown dialect names report themselves | `resolveDialect('not-a-db')` → `{ name: 'not-a-db', capabilities: universal }` — name lies about applied caps; return `'universal'` as the name too |
 | G9 | Cursor empty-page `hasPrevPage` edge | folded into F10 |
 | G10 | `custom()` doesn't strip `undefined` | folded into F15 |
-| G11 | PLAN.md drift | `expect-type` dev-dep claim (type tests are hand-rolled `Expect<Equal>`); M1 items already implemented; scope "placeholder" text while `@almamun2b` already ships |
-| G12 | No guard/amplified warning for non-unique `cursorField` | duplicates silently paginate wrong; README warning at minimum |
-| G13 | Stale `@mamun/` header in `src/index.ts` comment | renamed everywhere else (fixed in this pass, uncommitted) |
-| G14 | AGENTS.md has HTML-escaped entities (`&lt;`) | regenerate as plain text |
+| G11 | ~~PLAN.md drift~~ resolved 2026-10-29 | PLAN.md retired; surviving rules live in ARCHITECTURE.md/AGENTS.md (the `expect-type` claim had already been corrected in place) |
+| G12 | No guard/amplified warning for non-unique `cursorField` | duplicates silently paginate wrong; README warning done |
+| G13 | Stale `@mamun/` header in `src/index.ts` comment | fixed |
+| G14 | AGENTS.md has HTML-escaped entities (`&lt;`) | verified clean |
 
 ---
 
@@ -149,9 +157,9 @@ Computed-key literals (`{ [key]: value }`) are safe (own properties). `stripUnde
 
 **Verified working (compile-time, `npm run typecheck`):** flat select narrowing; nested relation **select**; include = base + projected relation; `| null` / `| undefined` preservation; `FindResultOf` ≡ `execute()`; strict `Expect<Equal>` suite — with zero Prisma imports.
 
-**Weak spots:** F3 is the one *wrong* (narrower) type; F9 omits `_count`; `TArgs` doesn't see projections passed via `custom()` (wider = safe, document; passthrough regains exactness); `sortBy`/`cursorField` `(string & {})` escape hatches weaken key safety (keep for compat, document); `RangeInput` raw strings for dates aren't coerced (document); `buildArgs()` cast to `FindManyArgsOf<D>` is the documented escape hatch but `custom()` bypasses narrowing at the merge site.
+**Weak spots:** F9 omits `_count` (the F3 wrong-type is fixed — see §1); `TArgs` doesn't see projections passed via `custom()` (wider = safe, document; passthrough regains exactness); `sortBy`/`cursorField` `(string & {})` escape hatches weaken key safety (keep for compat, document); `RangeInput` raw strings for dates aren't coerced (document); `buildArgs()` cast to `FindManyArgsOf<D>` is the documented escape hatch but `custom()` bypasses narrowing at the merge site.
 
-**Suggested type-test additions:** nested `include` (F3 regression), `_count` (F9 regression), relation-as-`true`, select/include mutual exclusion, strict `WhereInput` filter keys.
+**Suggested type-test additions:** nested `include` (F3 regression — **done**, `_7`–`_10`), `_count` (F9 regression), relation-as-`true`, select/include mutual exclusion, strict `WhereInput` filter keys.
 
 ---
 
@@ -174,19 +182,19 @@ Computed-key literals (`{ [key]: value }`) are safe (own properties). `stripUnde
 ## 7. Packaging / CI / docs gaps
 
 - CI: verify-only today. Missing (planned): version × DB integration matrix (M3), nightly canary vs `prisma@dev` (M3), provenance publish workflow (M4), coverage step.
-- Node 22 skipped in the CI matrix (18/20/24) — intentional? comment it.
-- Missing files: `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `examples/` (express, next-app-router, nest-provider).
-- `package.json`: add `bugs`, `homepage`; `engines`/`exports`/`sideEffects`/`files`/repository URL all correct post-rename ✅.
-- Docs: README needs precedence table (F11), per-request rule (F8), cursor-approximation note (F10), clamping note (F12), dialect-vs-global note (F7), framework recipes.
-- G11/G13/G14 doc drift (PLAN.md, `src/index.ts` header, AGENTS.md entities).
+- Node 22 omitted from the CI matrix (18/20/24) — intentional; commented in ci.yml (2026-10-29).
+- ~~Missing files~~ resolved (2026-10-29): `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, PR/issue templates, CODEOWNERS added; `examples/` (express, next-app-router, nest-provider) remains open (M4).
+- `package.json`: `bugs`/`homepage` added (2026-10-29); `engines`/`exports`/`sideEffects`/`files`/repository URL all correct post-rename ✅.
+- Docs: README precedence table (F11), per-request rule (F8), cursor-approximation note (F10), clamping note (F12), dialect-vs-global note (F7), cursorField uniqueness (G12), scalar-only search (F14) — all present in the README "Behavior contracts" section ✅; framework recipes still open (M4).
+- G11/G13/G14 doc drift — resolved (2026-10-29): PLAN.md retired and its surviving rules single-sourced into ARCHITECTURE.md/AGENTS.md; `src/index.ts` header fixed; AGENTS.md entities verified clean.
 
 ---
 
 ## 8. Test coverage gaps (highest value first)
 
-1. `executeWithMeta` × `cursorPaginate` (F1) — silently wrong today.
-2. `custom({ where })` × `initialArgs` seed survival (F2).
-3. Type test: nested `include` (F3).
+1. `executeWithMeta` × `cursorPaginate` (F1) — **done** (2026-10-29).
+2. `custom({ where })` × `initialArgs` seed survival (F2) — **done** (2026-10-29).
+3. Type test: nested `include` (F3) — **done** (2026-10-29, `_7`–`_10`).
 4. `executeWithCursor` with `select()` missing `cursorField` (F5).
 5. `sortBy` dot path (F6) + Date cursorField round-trip (F4).
 6. `first()` × `paginate()` semantics (G5) — pin intended behavior.
@@ -197,22 +205,22 @@ Computed-key literals (`{ [key]: value }`) are safe (own properties). `stripUnde
 
 ## 9. Remediation roadmap
 
-**P0 — before any adoption**
-1. F2 seed-where merge (`combineAnd` in `custom()`) + regression test.
-2. F1 throw (or cursor-aware meta) in `executeWithMeta()` under cursor mode + test.
-3. README contracts: precedence table (F11), per-request instances (F8), cursor approximations (F10), clamps (F12), dialect/global config (F7), cursorField uniqueness (G12), scalar-only search fields (F14).
+**P0 — before any adoption** ✅ **done (2026-10-29)**
+1. F2 seed-where merge — done (dedicated `customWhere` field + `combineAnd()` in `custom()`; 4 regression tests).
+2. F1 throw in `executeWithMeta()` under cursor mode — done (descriptive error, zero delegate calls; regression test).
+3. README contracts: precedence table (F11), per-request instances (F8), cursor approximations (F10), clamps (F12), dialect/global config (F7), cursorField uniqueness (G12), scalar-only search fields (F14) — done (README "Behavior contracts").
 
 **P1 — v0.2.0**
-4. F3 nested-include projection branch + type test.
+4. F3 nested-include projection branch + type test — done (2026-10-29, see the F3 row).
 5. F5 cursorField-missing guard; F6 `sortBy` dot-path expansion; F13 per-field match; F17 unify `FindResultOf`.
 6. F4 cursor serialization (`toISOString()` at minimum) + widen `cursor` type.
 7. F9 `_count` documented limitation + typed special case; F16 key hardening; F15 `custom()` strip.
-8. G11/G13/G14 doc drift; G2 wire-or-remove `detectDialect`.
+8. G11/G13/G14 doc drift — resolved (2026-10-29: PLAN.md retired and single-sourced, `src/index.ts` header fixed, AGENTS.md entities clean); G2 wire-or-remove `detectDialect` still open.
 
 **P2 — v0.3.0**
 9. F10 strict cursor-edge mode (`limit+2`); F12 `strictNumbers`; F18 skip cap; G1 multi-key `orderBy`; G3 `includeTotal`; G7 trim; G8 universal naming; G5/G6 docs; F7 `globalThis` shared config; NestJS/Next recipes.
 
-**P3 — v1.0 gates (PLAN.md M3/M4)**
+**P3 — v1.0 gates (test matrix + publish readiness)**
 10. Version × DB integration matrix + canary + provenance publish + coverage; CHANGELOG/CONTRIBUTING/SECURITY; examples; Bun/Deno matrix cells.
 
 ---

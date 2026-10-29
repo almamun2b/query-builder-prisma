@@ -3,7 +3,8 @@
  *
  * Nothing here imports Prisma. Any object exposing `findMany` + `count` with the
  * standard Prisma delegate call shape satisfies these contracts — Prisma 5, 6, 7,
- * 8, and (per PLAN.md §2 Rule 2) any future version that keeps its public API.
+ * 8, and (per ARCHITECTURE.md, invariant 2) any future version that keeps its
+ * public API.
  */
 
 /**
