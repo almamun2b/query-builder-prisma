@@ -1,11 +1,32 @@
 # Changelog
 
-Notable changes to `@almamun2b/prisma-query-builder`. Format follows
+Notable changes to `query-builder-prisma`. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is semver
 over the public surface (`src/index.ts` exports) plus the README behavior
 contracts.
 
 ## [Unreleased]
+
+Nothing yet.
+
+## [0.1.0] — 2026-10-29
+
+First release as `query-builder-prisma` — the same code published the same day
+as `@almamun2b/prisma-query-builder@0.1.0`, renamed before its first release
+under this name. A fluent, zero-coupling query builder over Prisma's structural
+`findMany` + `count` delegate call shape — search/filter/range/sort, offset and
+cursor pagination, a structural compile-time projection engine (`select`/
+`include` narrowing without Prisma types), and a dialect capability registry
+(`mode: 'insensitive'` gating), dual ESM+CJS.
+
+### Changed
+
+- **Package renamed** from `@almamun2b/prisma-query-builder` to
+  `query-builder-prisma` (unscoped). The `@prisma/` npm scope belongs to Prisma
+  and cannot be published to by third parties; the unscoped `prisma-query-builder`
+  name is already taken. The internal `globalThis` dialect-state symbol moved to
+  `Symbol.for('query-builder-prisma.dialect-state')` (no published release
+  depends on the old key). Install with `npm i query-builder-prisma`.
 
 ### Fixed
 
@@ -39,11 +60,3 @@ contracts.
 - Prisma-specific agent tooling: the 10 installed `prisma-*` skills and
   `.mcp.json` (Prisma docs MCP, Context7). This package imports nothing from
   Prisma, so tooling for using Prisma added noise without value.
-
-## [0.1.0] — 2026-10-29
-
-Initial release: a fluent, zero-coupling query builder over Prisma's structural
-`findMany` + `count` delegate call shape — search/filter/range/sort, offset and
-cursor pagination, a structural compile-time projection engine (`select`/
-`include` narrowing without Prisma types), and a dialect capability registry
-(`mode: 'insensitive'` gating), dual ESM+CJS.

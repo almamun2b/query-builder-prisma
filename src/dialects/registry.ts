@@ -27,7 +27,7 @@ interface DialectState {
  * audit F7). This is the only mutable module-adjacent state in the package;
  * prefer the per-builder `dialect` option anyway.
  */
-const STATE_KEY = Symbol.for('almamun2b.prisma-query-builder.dialect-state');
+const STATE_KEY = Symbol.for('query-builder-prisma.dialect-state');
 
 function state(): DialectState {
   const host = globalThis as typeof globalThis & { [STATE_KEY]?: DialectState };

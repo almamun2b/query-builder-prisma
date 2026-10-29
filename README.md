@@ -1,4 +1,4 @@
-# @almamun2b/prisma-query-builder
+# query-builder-prisma
 
 > Zero-coupling, fluent, fully type-safe query builder for any Prisma model delegate.
 > **Status: v0.1.0 — core API working.** Architecture: [ARCHITECTURE.md](./ARCHITECTURE.md)
@@ -43,7 +43,7 @@ const { meta, data } = await new QueryBuilder(prisma.user)
 ## Dialect configuration
 
 ```ts
-import { configureQueryBuilder } from '@almamun2b/prisma-query-builder';
+import { configureQueryBuilder } from 'query-builder-prisma';
 
 configureQueryBuilder({ dialect: 'postgres' });           // global default
 new QueryBuilder(prisma.user, { dialect: 'mysql' });      // per-builder override (recommended)
@@ -152,4 +152,4 @@ Docs: [ARCHITECTURE.md](./ARCHITECTURE.md) (design + boundaries),
 [CONTRIBUTING.md](./CONTRIBUTING.md) (how to contribute),
 [framework-recipes](./docs/framework-recipes.md) (Next.js / NestJS wiring).
 
-> **Note:** the npm scope `@almamun2b/` is live on npm.
+> **Note:** published on npm as `query-builder-prisma`.

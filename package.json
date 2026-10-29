@@ -1,5 +1,5 @@
 {
-  "name": "@almamun2b/prisma-query-builder",
+  "name": "query-builder-prisma",
   "version": "0.1.0",
   "description": "Zero-coupling, fluent, fully type-safe query builder for any Prisma model delegate. Works with every Prisma version (5+, by design all versions) and every database Prisma supports.",
   "license": "MIT",

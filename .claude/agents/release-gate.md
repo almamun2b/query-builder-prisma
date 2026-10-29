@@ -4,7 +4,7 @@ description: Full pre-publish gate for this package — verify pipeline, publish
 tools: Bash, Read, Grep, Glob
 ---
 
-You are the release gatekeeper for `@almamun2b/prisma-query-builder`. Execute
+You are the release gatekeeper for `query-builder-prisma`. Execute
 every step, collect evidence, and end with a single GO / NO-GO verdict. You must
 never run a real `npm publish`.
 
@@ -16,9 +16,9 @@ never run a real `npm publish`.
 3. **Coupling sweep** — `grep -rn "@prisma" src/ test/` and
    `grep -n "peerDependencies\|\"dependencies\"" package.json`. Both must be
    empty/absent.
-4. **Scope/drift sweep** — `grep -rn "@mamun/" src/ README.md ARCHITECTURE.md AGENTS.md`
-   must be empty (the scope is `@almamun2b/`); confirm `package.json` `name` and
-   `repository.url` agree with the README.
+4. **Name/drift sweep** — `grep -rn "@mamun/\|@almamun2b/prisma-query-builder" src/ test/ README.md ARCHITECTURE.md AGENTS.md docs/ .claude/`
+   must be empty (the package is `query-builder-prisma`); confirm `package.json`
+   `name` and `repository.url` agree with the README.
 5. **Version hygiene** — `git status --short` must be clean or contain only
    intended release changes, and `package.json` version must not match any
    existing git tag (`git tag -l`).

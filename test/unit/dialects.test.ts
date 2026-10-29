@@ -42,7 +42,7 @@ describe('resolveDialect', () => {
 
 describe('dialect state sharing (audit F7)', () => {
   it('lives on globalThis under the shared symbol, so ESM+CJS copies converge', () => {
-    const key = Symbol.for('almamun2b.prisma-query-builder.dialect-state');
+    const key = Symbol.for('query-builder-prisma.dialect-state');
     const host = globalThis as unknown as Record<symbol, { globalDialect?: string } | undefined>;
     configureQueryBuilder({ dialect: 'mysql' });
     expect(host[key]?.globalDialect).toBe('mysql');

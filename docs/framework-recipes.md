@@ -16,7 +16,7 @@ plain result data instead.
 // app/api/users/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { QueryBuilder } from '@almamun2b/prisma-query-builder';
+import { QueryBuilder } from 'query-builder-prisma';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -105,5 +105,5 @@ Nothing extra: the package has zero Node-API usage and ships pure ESM + CJS.
 Deno consumes it via the npm specifier:
 
 ```ts
-import { QueryBuilder } from 'npm:@almamun2b/prisma-query-builder';
+import { QueryBuilder } from 'npm:query-builder-prisma';
 ```

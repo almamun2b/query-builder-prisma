@@ -1,5 +1,5 @@
 /**
- * @almamun2b/prisma-query-builder
+ * query-builder-prisma
  *
  * Zero-coupling, fluent, fully type-safe query builder for any Prisma model
  * delegate. Works with every Prisma version (5/6/7/8 tested; future versions by

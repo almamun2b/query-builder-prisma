@@ -1,4 +1,7 @@
-# Consolidated Audit — `@almamun2b/prisma-query-builder` v0.1.0
+# Consolidated Audit — `query-builder-prisma` v0.1.0
+
+> Audited while the package was still named `@almamun2b/prisma-query-builder`;
+> renamed to `query-builder-prisma` on 2026-10-29 (see CHANGELOG).
 
 - **Date:** 2026-10-29 (merged from two independent audits: `AUDIT.md` A-series + `audit-2026-10-29.md` B/G-series)
 - **Updated:** 2026-10-29 (same day) — the three P0/HIGH findings (F1, F2, F3) are fixed with the regression tests this register asks for. **Second pass, same day:** every remaining P1/P2 code finding is fixed (F4–F18, G1–G3, G5–G8); F19 stays documented by decision; G4/G12 stay as documented guidance; only P3 release engineering remains open. **Internal register:** lives in `docs/` and is deliberately not referenced from any other doc; the user-facing subset of open limitations is mirrored in the README `Known limitations` section.
@@ -84,7 +87,7 @@ Prisma's real result for `.include({ author: { include: { posts: true } } })` is
 `configureQueryBuilder()` / `setDialectDetector()` / the registry `Map` live in module scope. A bundler loading the package as both ESM and CJS (possible in Next.js mixed middleware/server graphs) creates two instances; global dialect config set in one is invisible in the other → silent `'universal'` fallback.
 **Fix:** prefer per-builder `dialect` (already supported — document as the reliable path); optionally key shared state off `globalThis` (namespaced symbol); document the limitation.
 
-**Fixed (2026-10-29):** all dialect state (registry, global config, detector) moved to `globalThis` under `Symbol.for('almamun2b.prisma-query-builder.dialect-state')` — ESM+CJS copies converge on one config. ARCHITECTURE.md state contract updated; per-builder option stays the documented recommendation. Regression test: *"dialect state is shared via globalThis (audit F7)"*.
+**Fixed (2026-10-29):** all dialect state (registry, global config, detector) moved to `globalThis` under `Symbol.for('query-builder-prisma.dialect-state')` — ESM+CJS copies converge on one config. ARCHITECTURE.md state contract updated; per-builder option stays the documented recommendation. Regression test: *"dialect state is shared via globalThis (audit F7)"*.
 
 ### F8 — MED · statefulness / concurrency contract
 The builder accumulates state per instance. Sharing one instance across concurrent requests (NestJS singleton provider, module-level `const qb`) mixes conditions between requests. **Fix:** loud README contract — "one builder per query; instances are cheap"; consider an opt-in immutable (clone-per-method) variant for DI-heavy apps later.

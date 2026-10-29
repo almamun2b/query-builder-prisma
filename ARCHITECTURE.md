@@ -124,7 +124,7 @@ Cursor mode wins over offset mode when both are configured.
   conditions — preserve this contract in every framework recipe.
 - Global dialect config (`configureQueryBuilder`, the detector, the capability
   registry) lives on `globalThis` under the registered symbol
-  `Symbol.for('almamun2b.prisma-query-builder.dialect-state')`, so ESM and CJS
+  `Symbol.for('query-builder-prisma.dialect-state')`, so ESM and CJS
   copies of the package converge on ONE config (audit F7 — the former
   module-scope state had a dual-package hazard). The per-builder `dialect`
   option remains the recommended path. Never add module-scope mutable state;

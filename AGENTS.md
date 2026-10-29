@@ -5,7 +5,7 @@ Big-picture design: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## What this is
 
-`@almamun2b/prisma-query-builder` — a zero-coupling, fluent, type-safe query
+`query-builder-prisma` — a zero-coupling, fluent, type-safe query
 builder that wraps any Prisma model delegate. It imports nothing from Prisma; all
 types are derived structurally from the delegate the user passes in. That is the
 product's entire moat — every rule below protects it.
