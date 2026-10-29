@@ -1,0 +1,45 @@
+name: Publish
+
+# Auto-publish: any push to main whose package.json version is not yet on the
+# npm registry gets published (docs-only pushes are skipped by the version
+# gate). `prepublishOnly` in package.json runs the full verify pipeline before
+# anything ships. workflow_dispatch exists to re-run a failed publish (e.g.
+# after fixing a registry-side issue) without a new commit.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # npm provenance attestation
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'almamun2b/query-builder-prisma'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+      - run: npm ci
+      - name: Publish if version is not on npm yet
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          # Check every published version, not just the `latest` dist-tag, so
+          # a version published under a non-latest tag still skips the gate.
+          if npm view query-builder-prisma versions --json 2>/dev/null | grep -qF "\"$LOCAL_VERSION\""; then
+            echo "query-builder-prisma@$LOCAL_VERSION is already published — nothing to do."
+          else
+            echo "Publishing query-builder-prisma@$LOCAL_VERSION (version not found on the registry)."
+            npm publish --provenance
+          fi
