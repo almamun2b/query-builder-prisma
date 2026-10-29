@@ -7,7 +7,20 @@ contracts.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Full user documentation set: docs hub (`docs/index.md`), getting-started
+  guide, seven task guides (filtering, sorting, offset pagination, cursor
+  pagination, projections, dialects, advanced patterns), a complete API
+  reference (every `QueryBuilder` method, all exported types, all exported
+  functions/constants), and ten end-to-end use cases
+  (`docs/examples/use-cases.md`).
+
+### Changed
+
+- README restructured into a user-facing landing page (install, quick start,
+  feature tour, FAQ) while keeping the normative "Behavior contracts" and
+  "Known limitations" sections as the source of truth.
 
 ## [0.1.0] — 2026-10-29
 

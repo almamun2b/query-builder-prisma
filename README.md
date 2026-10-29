@@ -1,59 +1,129 @@
 # query-builder-prisma
 
-> Zero-coupling, fluent, fully type-safe query builder for any Prisma model delegate.
-> **Status: v0.1.0 — core API working.** Architecture: [ARCHITECTURE.md](./ARCHITECTURE.md)
-> · Contributing: [CONTRIBUTING.md](./CONTRIBUTING.md)
+[![npm version](https://img.shields.io/npm/v/query-builder-prisma.svg)](https://www.npmjs.com/package/query-builder-prisma)
+[![CI](https://github.com/almamun2b/prisma-query-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/almamun2b/prisma-query-builder/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/query-builder-prisma.svg)](./LICENSE)
+[![node](https://img.shields.io/node/v/query-builder-prisma.svg)](https://www.npmjs.com/package/query-builder-prisma)
 
-Works with **every Prisma version — 5, 6, 7, 8 and future majors by design** — and every
-database Prisma supports (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, CockroachDB,
-MongoDB), because it imports **nothing** from Prisma: all types are derived structurally
-from the delegate you pass in.
-
-## The idea
-
-An npm package that imports Prisma types will break on Prisma's next major (import paths
-changed in v7, the type utilities move in v8, the engine was rewritten...). This package
-speaks only Prisma's stable public contract — the model-delegate call shape — so a Prisma
-upgrade can never break it.
+> Zero-coupling, fluent, fully type-safe query builder for any Prisma model
+> delegate. Works with **every Prisma version — 5, 6, 7, 8 and future majors by
+> design** — and every database Prisma supports.
 
 ```ts
 const { meta, data } = await new QueryBuilder(prisma.user)
-  .search({ searchText: q, fields: ['email', 'username'] }) // dialect-aware: no `mode` on MySQL/SQLite/SQLServer
-  .filter({ role, status })                                  // undefined values stripped
+  .search({ searchText: q, fields: ['email', 'username'] }) // dialect-aware
+  .filter({ role, status })                                 // undefined values stripped
   .range({ createdAt: { from, to }, 'avatar.size': { from: min } })
   .sortBy({ sortBy: 'createdAt', sortOrder: 'desc' })
-  .paginate({ page: 1, limit: 20 })                          // or .cursorPaginate({...})
-  .select({ id: true, email: true })                         // output type narrows structurally
+  .paginate({ page: 1, limit: 20 })                         // or .cursorPaginate({...})
+  .select({ id: true, email: true })                        // output type narrows structurally
   .executeWithMeta();
 // meta: { page: 1, limit: 20, total: 142, totalPage: 8 }
 ```
 
-## Design rules (enforced in review — [ARCHITECTURE.md](./ARCHITECTURE.md) invariants)
+## Why
 
-1. **Zero Prisma coupling** — no runtime or type imports from Prisma; no peerDependencies.
-2. **Everything is structural** — only requires that a "model" has `findMany` + `count`
-   with the standard call shape.
-3. **Types degrade gracefully, never lie** — `select`/`include` narrowing is implemented
-   by our own structural projection engine; for 100% Prisma-native inference use the
-   passthrough `prisma.user.findMany(qb.buildArgs())`.
-4. **Dialects are a capability registry** — `mode: 'insensitive'` is only emitted for
-   PostgreSQL/CockroachDB/MongoDB (it throws on MySQL/SQLite/SQL Server). New/future
-   databases need one `registerDialect()` call, no core changes.
+An npm package that imports Prisma types breaks on Prisma's next major — import
+paths changed in v7, the type utilities move in v8, the engine was rewritten.
+This package speaks only Prisma's stable public contract, the **model-delegate
+call shape**:
 
-## Dialect configuration
+```
+model.findMany({ where, orderBy, skip, take, select, include, cursor, distinct })
+model.count({ where })
+```
+
+It imports **nothing** from Prisma — no runtime imports, no type imports, no
+peer dependencies. All types are derived structurally from the delegate you
+pass in, so a Prisma upgrade can never break it. The test suite runs with zero
+Prisma installed; that is the standing proof.
+
+## Install
+
+```bash
+npm install query-builder-prisma
+```
+
+Node ≥ 18; TypeScript ≥ 5 for inference (plain JS works). Dual ESM + CJS; zero
+runtime dependencies.
+
+## Documentation
+
+|                                                                      |                                                    |
+| -------------------------------------------------------------------- | -------------------------------------------------- |
+| [Getting started](./docs/getting-started.md)                          | install, first query, imports                      |
+| [Guides](./docs/index.md#guides)                                      | filtering, sorting, both pagination modes, projections, dialects, advanced patterns |
+| [API reference](./docs/api/query-builder.md)                          | every method, type and function                    |
+| [Use cases](./docs/examples/use-cases.md)                             | end-to-end scenarios                               |
+| [Framework recipes](./docs/framework-recipes.md)                      | Next.js, NestJS, Express, edge runtimes            |
+
+## Features
+
+- **Fluent chain** — `search`, `filter`, `range`, `where`, `sortBy`/`orderBy`,
+  `paginate`/`cursorPaginate`, `select`/`include`, `custom`, folded into one
+  `findMany` call.
+- **Offset pagination with metadata** — `executeWithMeta()` returns
+  `page`/`limit`/`total`/`totalPage`, with `COUNT` + `findMany` in parallel and
+  an opt-in fast path (`includeTotal: false`) that skips the `COUNT`.
+- **Cursor (seek) pagination** — stable deep pages for feeds and infinite
+  scroll, forward/backward walking, ISO-8601-safe `Date` cursors, exact flags
+  via `strict: true`.
+- **Structural type projection** — `.select()`/`.include()` narrow result types
+  like Prisma's own overloads, nested includes included, without Prisma types.
+- **Dialect capability registry** — `mode: 'insensitive'` only where Prisma
+  accepts it; new databases are one `registerDialect()` call.
+- **Hardened by default** — `undefined` stripping at any depth, prototype-key
+  refusal, clamped (or thrown) pagination numbers, a seed `where` that cannot
+  be replaced.
+
+### Offsetting and counting
+
+```ts
+const { meta, data } = await new QueryBuilder(prisma.user)
+  .filter({ status: 'ACTIVE' })
+  .paginate({ page: 2, limit: 20 })
+  .executeWithMeta();                    // meta: { page: 2, limit: 20, total, totalPage }
+
+// Skip the COUNT query on large tables:
+await qb.executeWithMeta({ includeTotal: false }); // total: null, totalPage: null
+```
+
+### Cursor pagination
+
+```ts
+const page = await new QueryBuilder(prisma.post)
+  .sortBy({ sortBy: 'createdAt', sortOrder: 'desc' })
+  .cursorPaginate({ cursor: prev?.nextCursor, cursorField: 'createdAt', limit: 10 })
+  .executeWithCursor();
+// meta: { limit, nextCursor, prevCursor, hasNextPage, hasPrevPage }
+// rows always in configured sort order, whatever the walking direction
+```
+
+### Type-safe projections
+
+```ts
+const users = await new QueryBuilder(prisma.user)
+  .select({ id: true, posts: { select: { title: true } } })
+  .execute();
+// users: { id: string; posts: { title: string }[] }[] — no Prisma types involved
+
+// 100% Prisma-native inference whenever you want it:
+await prisma.user.findMany(qb.buildArgs());
+```
+
+### Dialects
 
 ```ts
 import { configureQueryBuilder } from 'query-builder-prisma';
 
-configureQueryBuilder({ dialect: 'postgres' });           // global default
-new QueryBuilder(prisma.user, { dialect: 'mysql' });      // per-builder override (recommended)
+configureQueryBuilder({ dialect: 'postgresql' });      // global default
+new QueryBuilder(prisma.user, { dialect: 'mysql' });   // per-builder override (recommended)
 ```
 
-The global config state is shared through `globalThis` under a registered symbol, so
-bundler graphs that load this package as both ESM and CJS still see ONE config.
-The per-builder option stays the recommended path; unknown dialect names resolve
-to `'universal'` (reported name included — the name never lies about the applied
-capabilities).
+`search()` emits `mode: 'insensitive'` only on PostgreSQL / CockroachDB /
+MongoDB (it throws on MySQL, SQLite, SQL Server); elsewhere the database's
+collation or Prisma's limits apply. Unknown dialect names resolve to
+`'universal'` — arguments valid on every database.
 
 ## Behavior contracts
 
@@ -131,11 +201,38 @@ Open and documented rather than hidden — none produces a silently wrong result
   sort-ordered pages (kept as raw-passthrough semantics by design; the
   `buildArgs()` passthrough is always available).
 
+## FAQ
+
+**Does this need Prisma installed?**
+The package never imports Prisma, but of course you query *through* your
+Prisma delegates — you pass them in. Any object with the `findMany` + `count`
+call shape works, which is also how the test suite proves the decoupling.
+
+**Which Prisma versions are supported?**
+Every version whose model delegates keep the standard call shape — 5, 6, 7, 8
+today, future majors by design. There is nothing to update on a Prisma
+upgrade.
+
+**Can I share one builder across requests?**
+No — one builder per query. Instances are cheap; a shared instance mixes
+conditions between concurrent requests. See
+[Advanced patterns](./docs/guides/advanced.md#one-builder-per-query) and the
+[framework recipes](./docs/framework-recipes.md).
+
+**What if a type isn't narrow enough?**
+The engine degrades wider, never wrong (today only `_count`). For exact
+Prisma-native inference on any query, use the passthrough:
+`prisma.user.findMany(qb.buildArgs())`.
+
+**How do I add a database Prisma adds later?**
+One `registerDialect(name, capabilities)` call — no core changes. See
+[Dialects](./docs/guides/dialects.md).
+
 ## Development
 
 ```bash
-npm run verify   # lint + typecheck + test + build
-npm test         # unit tests (fake delegates, zero Prisma required)
+npm run verify   # lint + typecheck + test + build (the bar for every change)
+npm test         # unit tests — fake delegates, zero Prisma required
 ```
 
 - `src/core` — builder, condition assembly, pagination math
@@ -144,12 +241,13 @@ npm test         # unit tests (fake delegates, zero Prisma required)
 - `test/types` — compile-time projection tests (run by `npm run typecheck`)
 - `builder-old/` — the original prototype this package was extracted from (reference only)
 
-Agent tooling (review agents, official Prisma skills, MCP servers) is documented
-in [CONTRIBUTING.md](./CONTRIBUTING.md) and [AGENTS.md](./AGENTS.md).
+### Links
 
-Docs: [ARCHITECTURE.md](./ARCHITECTURE.md) (design + boundaries),
-[AGENTS.md](./AGENTS.md) (agent/contributor rules),
-[CONTRIBUTING.md](./CONTRIBUTING.md) (how to contribute),
-[framework-recipes](./docs/framework-recipes.md) (Next.js / NestJS wiring).
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — design, boundaries, invariants
+- [docs/index.md](./docs/index.md) — full documentation hub
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — how to contribute
+- [SECURITY.md](./SECURITY.md) — vulnerability reporting
+- [CHANGELOG.md](./CHANGELOG.md) — release history
 
-> **Note:** published on npm as `query-builder-prisma`.
+> Published on npm as [`query-builder-prisma`](https://www.npmjs.com/package/query-builder-prisma).
+> MIT licensed.
