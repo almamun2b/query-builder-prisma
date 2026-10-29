@@ -7,13 +7,13 @@ and the [types](./types.md): the dialect registry API and the
 ## Dialect registry
 
 Resolution order when a builder needs capabilities: per-builder `dialect`
-option → global `configureQueryBuilder` → registered auto-detector → built-in
+option → global `configQueryBuilder` → registered auto-detector → built-in
 detector → `'universal'`. See [Dialects](../guides/dialects.md).
 
-### `configureQueryBuilder()`
+### `configQueryBuilder()`
 
 ```ts
-function configureQueryBuilder(options: { dialect?: string | undefined }): void
+function configQueryBuilder(options: { dialect?: string | undefined }): void
 ```
 
 Sets the global default dialect for all builders that do not override it.
@@ -21,7 +21,7 @@ Unknown names fall through to `'universal'` at resolution time (they are
 stored as given and validated on lookup).
 
 ```ts
-configureQueryBuilder({ dialect: 'postgresql' });
+configQueryBuilder({ dialect: 'postgresql' });
 ```
 
 ### `registerDialect()`

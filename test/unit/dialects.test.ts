@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  configureQueryBuilder,
+  configQueryBuilder,
   registerDialect,
   resetDialectConfig,
   resolveDialect,
@@ -16,7 +16,7 @@ describe('resolveDialect', () => {
     expect(resolved.capabilities.caseInsensitiveMode).toBe(false);
   });
   it('explicit wins over global config', () => {
-    configureQueryBuilder({ dialect: 'postgresql' });
+    configQueryBuilder({ dialect: 'postgresql' });
     expect(resolveDialect('mongodb').name).toBe('mongodb');
     expect(resolveDialect().name).toBe('postgresql');
   });
@@ -44,7 +44,7 @@ describe('dialect state sharing (audit F7)', () => {
   it('lives on globalThis under the shared symbol, so ESM+CJS copies converge', () => {
     const key = Symbol.for('query-builder-prisma.dialect-state');
     const host = globalThis as unknown as Record<symbol, { globalDialect?: string } | undefined>;
-    configureQueryBuilder({ dialect: 'mysql' });
+    configQueryBuilder({ dialect: 'mysql' });
     expect(host[key]?.globalDialect).toBe('mysql');
     resetDialectConfig();
     expect(host[key]?.globalDialect).toBeUndefined();

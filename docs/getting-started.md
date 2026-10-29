@@ -22,6 +22,8 @@ or at type level, and ships dual ESM + CJS from a single entry.
 npm install query-builder-prisma
 ```
 
+Available on npm: [`query-builder-prisma`](https://www.npmjs.com/package/query-builder-prisma).
+
 ```bash
 yarn add query-builder-prisma
 ```
@@ -74,12 +76,12 @@ run with no Prisma installed at all: hand-written fakes prove the contract.
 
 ```ts
 // ESM
-import { QueryBuilder, configureQueryBuilder } from 'query-builder-prisma';
+import { QueryBuilder, configQueryBuilder } from 'query-builder-prisma';
 ```
 
 ```js
 // CJS
-const { QueryBuilder, configureQueryBuilder } = require('query-builder-prisma');
+const { QueryBuilder, configQueryBuilder } = require('query-builder-prisma');
 ```
 
 ```ts
@@ -97,9 +99,9 @@ setup — the package has zero Node-API usage. See
    like `search()` emit valid arguments for your database:
 
    ```ts
-   import { configureQueryBuilder } from 'query-builder-prisma';
+   import { configQueryBuilder } from 'query-builder-prisma';
 
-   configureQueryBuilder({ dialect: 'postgresql' });
+   configQueryBuilder({ dialect: 'postgresql' });
    // or per builder (recommended):
    new QueryBuilder(prisma.user, { dialect: 'postgresql' });
    ```

@@ -5,7 +5,22 @@ Notable changes to `query-builder-prisma`. Format follows
 over the public surface (`src/index.ts` exports) plus the README behavior
 contracts.
 
-## [Unreleased]
+## [0.2.0] — 2026-10-30
+
+### Changed
+
+- **BREAKING:** `configureQueryBuilder()` renamed to `configQueryBuilder()` —
+  clearer, and the old name only existed in yesterday's 0.1.0. Update imports:
+  `import { configQueryBuilder } from 'query-builder-prisma'`.
+- GitHub repository renamed to
+  [`almamun2b/query-builder-prisma`](https://github.com/almamun2b/query-builder-prisma);
+  `package.json` `repository`/`homepage`/`bugs` URLs and the README CI badge
+  now point at the new slug. Pushes to `main` auto-publish to npm whenever
+  `package.json` carries a version not yet on the registry
+  (`.github/workflows/publish.yml`, version-gated, npm provenance attested).
+- README restructured into a user-facing landing page (install, quick start,
+  feature tour, FAQ) while keeping the normative "Behavior contracts" and
+  "Known limitations" sections as the source of truth.
 
 ### Added
 
@@ -15,12 +30,6 @@ contracts.
   reference (every `QueryBuilder` method, all exported types, all exported
   functions/constants), and ten end-to-end use cases
   (`docs/examples/use-cases.md`).
-
-### Changed
-
-- README restructured into a user-facing landing page (install, quick start,
-  feature tour, FAQ) while keeping the normative "Behavior contracts" and
-  "Known limitations" sections as the source of truth.
 
 ## [0.1.0] — 2026-10-29
 

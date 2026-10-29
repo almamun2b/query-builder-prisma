@@ -47,7 +47,7 @@ export interface QueryBuilderOptions<D extends PrismaModelDelegate> {
   /** Seed `findMany` args, e.g. `{ where: { deletedAt: null } }` (prepended to every `where`). */
   initialArgs?: FindManyArgsOf<D> | undefined;
   /**
-   * Per-builder dialect override. When omitted: global `configureQueryBuilder()`
+   * Per-builder dialect override. When omitted: global `configQueryBuilder()`
    * config → registered auto-detector → `'universal'` (always-valid args).
    */
   dialect?: Dialect | undefined;

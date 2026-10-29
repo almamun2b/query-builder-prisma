@@ -10,19 +10,19 @@ and a new database never requires changes to the builder itself.
 ## Configuring the dialect
 
 ```ts
-import { QueryBuilder, configureQueryBuilder } from 'query-builder-prisma';
+import { QueryBuilder, configQueryBuilder } from 'query-builder-prisma';
 
 // 1. Per builder — recommended: explicit and visible at the call site
 new QueryBuilder(prisma.user, { dialect: 'postgresql' });
 
 // 2. Global default for builders without an override
-configureQueryBuilder({ dialect: 'postgresql' });
+configQueryBuilder({ dialect: 'postgresql' });
 ```
 
 Resolution order (first hit wins, fails soft):
 
 1. per-builder `dialect` option
-2. global `configureQueryBuilder({ dialect })`
+2. global `configQueryBuilder({ dialect })`
 3. registered auto-detector — `setDialectDetector(fn)`
 4. built-in detector — `detectDialect()` (a no-op in v0)
 5. `'universal'` — emits only arguments valid on **every** Prisma database

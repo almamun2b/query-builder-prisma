@@ -79,7 +79,7 @@ anything not re-exported there does not exist for consumers.
 | `core/pagination.ts`     | Pure offset/seek math: clamping, `toOffsetArgs`, `toCursorArgs`, `buildCursorPage`.                          |
 | `core/query-builder.ts`  | The fluent facade. Owns all mutable state; the only module that calls the delegate.                          |
 | `dialects/capabilities.ts` | Capability sets per database (pure data).                                                                 |
-| `dialects/registry.ts`   | `registerDialect`, `configureQueryBuilder`, dialect resolution order.                                        |
+| `dialects/registry.ts`   | `registerDialect`, `configQueryBuilder`, dialect resolution order.                                           |
 | `dialects/detect.ts`     | Built-in auto-detect hook (wired into the resolution order); v0 always returns `undefined` → falls through to `'universal'`. |
 
 ## The four invariants
@@ -122,7 +122,7 @@ Cursor mode wins over offset mode when both are configured.
 - The builder accumulates state per instance: **one builder per query;
   instances are cheap**. Sharing an instance across concurrent requests mixes
   conditions — preserve this contract in every framework recipe.
-- Global dialect config (`configureQueryBuilder`, the detector, the capability
+- Global dialect config (`configQueryBuilder`, the detector, the capability
   registry) lives on `globalThis` under the registered symbol
   `Symbol.for('query-builder-prisma.dialect-state')`, so ESM and CJS
   copies of the package converge on ONE config (audit F7 — the former
@@ -151,7 +151,7 @@ Cursor mode wins over offset mode when both are configured.
 Resolution order (first hit wins; fails soft):
 
 1. per-builder — `new QueryBuilder(delegate, { dialect: 'mysql' })`
-2. global — `configureQueryBuilder({ dialect })`
+2. global — `configQueryBuilder({ dialect })`
 3. registered auto-detector — `setDialectDetector(fn)`
 4. `'universal'` — emits only arguments valid on every Prisma-supported database.
 

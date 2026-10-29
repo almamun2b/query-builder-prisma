@@ -7,7 +7,7 @@ import { detectDialect } from './detect';
  *
  * Resolution order (fails soft to 'universal', which is always valid):
  *   1. explicit per-builder override  new QueryBuilder(prisma.user, { dialect: 'mysql' })
- *   2. global config                  configureQueryBuilder({ dialect: 'postgres' })
+ *   2. global config                  configQueryBuilder({ dialect: 'postgresql' })
  *   3. registered auto-detector       setDialectDetector(fn)
  *   4. built-in detector              detectDialect() (no-op in v0 — audit G2)
  *   5. 'universal'
@@ -47,7 +47,7 @@ export function registerDialect(name: string, capabilities: DialectCapabilities)
 }
 
 /** Set the global default dialect for all builders that do not override it. */
-export function configureQueryBuilder(options: { dialect?: string | undefined }): void {
+export function configQueryBuilder(options: { dialect?: string | undefined }): void {
   state().globalDialect = options.dialect;
 }
 

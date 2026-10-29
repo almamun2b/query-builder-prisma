@@ -1,7 +1,7 @@
 # query-builder-prisma
 
 [![npm version](https://img.shields.io/npm/v/query-builder-prisma.svg)](https://www.npmjs.com/package/query-builder-prisma)
-[![CI](https://github.com/almamun2b/prisma-query-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/almamun2b/prisma-query-builder/actions/workflows/ci.yml)
+[![CI](https://github.com/almamun2b/query-builder-prisma/actions/workflows/ci.yml/badge.svg)](https://github.com/almamun2b/query-builder-prisma/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/query-builder-prisma.svg)](./LICENSE)
 [![node](https://img.shields.io/node/v/query-builder-prisma.svg)](https://www.npmjs.com/package/query-builder-prisma)
 
@@ -43,6 +43,8 @@ Prisma installed; that is the standing proof.
 ```bash
 npm install query-builder-prisma
 ```
+
+Published on npm as [`query-builder-prisma`](https://www.npmjs.com/package/query-builder-prisma).
 
 Node ≥ 18; TypeScript ≥ 5 for inference (plain JS works). Dual ESM + CJS; zero
 runtime dependencies.
@@ -114,9 +116,9 @@ await prisma.user.findMany(qb.buildArgs());
 ### Dialects
 
 ```ts
-import { configureQueryBuilder } from 'query-builder-prisma';
+import { configQueryBuilder } from 'query-builder-prisma';
 
-configureQueryBuilder({ dialect: 'postgresql' });      // global default
+configQueryBuilder({ dialect: 'postgresql' });         // global default
 new QueryBuilder(prisma.user, { dialect: 'mysql' });   // per-builder override (recommended)
 ```
 

@@ -13,7 +13,7 @@ export type { QueryBuilderOptions } from './core/query-builder';
 
 // Dialects
 export {
-  configureQueryBuilder,
+  configQueryBuilder,
   registerDialect,
   resolveDialect,
   resetDialectConfig,

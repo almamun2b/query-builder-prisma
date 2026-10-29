@@ -10,7 +10,7 @@ import type { Dialect } from './capabilities';
  * unknown dialect must degrade to `'universal'`, not to a wrong guess.
  *
  * Users who know their database should prefer explicit configuration:
- *   configureQueryBuilder({ dialect: 'postgres' })
+ *   configQueryBuilder({ dialect: 'postgresql' })
  * or per builder:
  *   new QueryBuilder(prisma.user, { dialect: 'mongodb' })
  */

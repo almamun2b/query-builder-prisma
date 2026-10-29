@@ -1,6 +1,7 @@
 # Documentation
 
-`query-builder-prisma` — a zero-coupling, fluent, fully type-safe query builder
+[`query-builder-prisma`](https://www.npmjs.com/package/query-builder-prisma) — a
+zero-coupling, fluent, fully type-safe query builder
 for any Prisma model delegate. It imports nothing from Prisma: every option and
 result type is derived structurally from the delegate you pass in, so a Prisma
 upgrade can never break your build.
