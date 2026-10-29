@@ -50,6 +50,7 @@ export type {
   CursorMeta,
   FilterInput,
   PaginationMeta,
+  PaginationMetaNoTotal,
   RangeBound,
   RangeInput,
   SortOrder,

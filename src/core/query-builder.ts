@@ -1,6 +1,7 @@
 import type {
   FindManyArgsOf,
   IncludeOf,
+  OrderByOf,
   OrderKeyOf,
   PrismaModelDelegate,
   RowElementOf,
@@ -14,18 +15,30 @@ import type {
   CursorMeta,
   FilterInput,
   PaginationMeta,
+  PaginationMetaNoTotal,
   RangeBound,
   RangeInput,
   SortOrder,
 } from '../types/public';
-import { combineAnd, expandDotPath, stripUndefined } from './conditions';
+import {
+  combineAnd,
+  deepStripUndefined,
+  expandDotPath,
+  isPlainObject,
+  stripUndefined,
+} from './conditions';
 import {
   buildCursorPage,
   buildPaginationMeta,
+  clampLimit,
+  clampPage,
   toCursorArgs,
   toOffsetArgs,
   DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  MAX_SKIP,
 } from './pagination';
+import type { ExactCursorFlags } from './pagination';
 import { resolveDialect } from '../dialects/registry';
 import type { Dialect } from '../dialects/capabilities';
 
@@ -38,7 +51,18 @@ export interface QueryBuilderOptions<D extends PrismaModelDelegate> {
    * config → registered auto-detector → `'universal'` (always-valid args).
    */
   dialect?: Dialect | undefined;
+  /**
+   * Throw on out-of-range pagination input instead of clamping silently:
+   * limits outside `[1, 1000]`, pages below 1, or a computed `skip` beyond
+   * `MAX_SKIP` (audits F12 / F18). Defaults to clamping.
+   */
+  strictNumbers?: boolean | undefined;
 }
+
+/** Meta type of {@link QueryBuilder.executeWithMeta} for the given options. */
+type MetaOf<O extends { includeTotal?: boolean }> = O['includeTotal'] extends false
+  ? PaginationMetaNoTotal
+  : PaginationMeta;
 
 /** Thrown by {@link QueryBuilder.firstOrThrow} when no row matched. */
 export class NoResultError extends Error {
@@ -75,6 +99,7 @@ export class NoResultError extends Error {
 export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   private readonly delegate: D;
   private readonly dialect: Dialect | undefined;
+  private readonly strictNumbers: boolean;
   private readonly andConditions: object[] = [];
   private customArgs: Record<string, unknown> = {};
   /**
@@ -83,24 +108,26 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * seed instead of replacing it (audit F2 — the seed carries safety filters).
    */
   private customWhere: unknown;
-  private orderBy: object | undefined;
+  private orderByArg: object | undefined;
   private selectArg: object | undefined;
   private includeArg: object | undefined;
   private page: number | undefined;
   private limit: number | undefined;
   private cursorActive = false;
-  private cursor: string | undefined;
+  private cursor: string | number | Date | undefined;
   private cursorLimit: number | undefined;
   private cursorDirection: CursorDirection = 'forward';
   private cursorField: string = 'id';
+  private cursorStrict = false;
 
   /**
    * @param delegate - The Prisma delegate to query (e.g. `prisma.user`).
-   * @param options - Optional seed args and/or a dialect override.
+   * @param options - Optional seed args, a dialect override, or `strictNumbers`.
    */
   constructor(delegate: D, options?: QueryBuilderOptions<D>) {
     this.delegate = delegate;
     this.dialect = options?.dialect;
+    this.strictNumbers = options?.strictNumbers ?? false;
     if (options?.initialArgs) {
       const { where, ...rest } = options.initialArgs as Record<string, unknown>;
       this.customArgs = { ...rest };
@@ -110,7 +137,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
 
   /**
    * Case-insensitive `contains` across the provided string fields. No condition
-   * is added when `searchText` is empty.
+   * is added when `searchText` is empty or whitespace-only (audit G7).
    *
    * Dialect-aware: adds `mode: 'insensitive'` only where Prisma accepts it (see
    * `caseInsensitiveMode` in `src/dialects/capabilities.ts`); everywhere else
@@ -119,14 +146,20 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * there.
    */
   search(params: { searchText?: string | undefined; fields: WhereKeyOf<D>[] }): this {
-    const { searchText, fields } = params;
-    if (searchText && fields.length > 0) {
+    const text = params.searchText?.trim();
+    const fields = params.fields;
+    if (text && fields.length > 0) {
       const { capabilities } = resolveDialect(this.dialect);
-      const match: Record<string, unknown> = { contains: searchText };
-      if (capabilities.caseInsensitiveMode) {
-        match.mode = 'insensitive';
-      }
-      this.andConditions.push({ OR: fields.map((field) => ({ [field]: match })) });
+      this.andConditions.push({
+        OR: fields.map((field) => {
+          // One match object per arm — never a shared reference (audit F13).
+          const match: Record<string, unknown> = { contains: text };
+          if (capabilities.caseInsensitiveMode) {
+            match.mode = 'insensitive';
+          }
+          return { [field]: match };
+        }),
+      });
     }
     return this;
   }
@@ -158,7 +191,10 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
         condition.lte = bound.to;
       }
       if (Object.keys(condition).length > 0) {
-        this.andConditions.push(expandDotPath(path, condition));
+        const expanded = expandDotPath(path, condition);
+        if (Object.keys(expanded).length > 0) {
+          this.andConditions.push(expanded);
+        }
       }
     }
     return this;
@@ -173,17 +209,36 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     return this;
   }
 
-  /** Sets `orderBy`. No-op when `sortBy` is not provided. */
+  /**
+   * Sets `orderBy` from a single key. No-op when `sortBy` is not provided.
+   * Dot paths expand like `.range()` (`'avatar.size'` → `{ avatar: { size } }`,
+   * audit F6). For multi-key or nested relation sorts use {@link orderBy}.
+   */
   sortBy(params: { sortBy?: OrderKeyOf<D> | (string & {}); sortOrder?: SortOrder }): this {
     const { sortBy, sortOrder = 'desc' } = params;
     if (sortBy) {
-      this.orderBy = { [sortBy]: sortOrder };
+      const expanded = expandDotPath(sortBy, sortOrder);
+      if (Object.keys(expanded).length > 0) {
+        this.orderByArg = expanded;
+      }
     }
+    return this;
+  }
+
+  /**
+   * Sets `orderBy` verbatim from the full Prisma shape: arrays for multi-key
+   * sorts, nested relation order objects. `.sortBy()` remains the single-key
+   * convenience — the latest of the two calls wins (audit G1).
+   */
+  orderBy(order: OrderByOf<D>): this {
+    this.orderByArg = order as object;
     return this;
   }
 
   /** Configures `skip`/`take` from a 1-based page number and page size. */
   paginate(params: { page?: number; limit?: number }): this {
+    this.assertPage(params.page);
+    this.assertLimit(params.limit);
     this.page = params.page ?? 1;
     this.limit = params.limit ?? DEFAULT_PAGE_SIZE;
     return this;
@@ -194,24 +249,30 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * to run the query and obtain `next`/`prev` cursors.
    *
    * - `cursor` is the value of `cursorField` from the edge row of the previous
-   *   page (omit it for the first page).
+   *   page (omit it for the first page). Strings, numbers and Dates are
+   *   accepted; Dates serialize to ISO-8601 in the returned cursors (audit F4).
    * - `direction` walks `'forward'` (next) or `'backward'` (previous).
    * - `cursorField` is the unique, sequential column to seek on (default `id`).
    *   Pair it with a matching {@link sortBy} for stable ordering.
+   * - `strict` spends one extra 1-row probe query to make `hasNextPage` /
+   *   `hasPrevPage` exact instead of optimistic (audit F10).
    *
    * Takes precedence over {@link paginate} when both are set.
    */
   cursorPaginate(params: {
-    cursor?: string | undefined;
+    cursor?: string | number | Date | undefined;
     limit?: number;
     direction?: CursorDirection;
     cursorField?: OrderKeyOf<D> | (string & {});
+    strict?: boolean;
   }): this {
+    this.assertLimit(params.limit);
     this.cursorActive = true;
     this.cursor = params.cursor;
     this.cursorLimit = params.limit;
     this.cursorDirection = params.direction ?? 'forward';
     this.cursorField = params.cursorField ?? 'id';
+    this.cursorStrict = params.strict ?? false;
     return this;
   }
 
@@ -247,15 +308,22 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
 
   /**
    * Merges raw `findMany` args, e.g. `cursor`, `distinct` or a custom `where`.
-   * A custom `where` is AND-ed with the `initialArgs` seed and any previous
-   * custom `where` — it never replaces them (audit F2). Successive custom
-   * `where`s may nest `{ AND: [...] }` groups; Prisma treats that identically.
+   * Values that are `undefined` are stripped at any depth, so
+   * `custom({ distinct: undefined })` cannot overwrite an earlier value
+   * (audit F15). A custom `where` is AND-ed with the `initialArgs` seed and any
+   * previous custom `where` — it never replaces them (audit F2). Successive
+   * custom `where`s may nest `{ AND: [...] }` groups; Prisma treats that
+   * identically.
    */
   custom(args: FindManyArgsOf<D>): this {
     const { where, ...rest } = args as Record<string, unknown>;
-    this.customArgs = { ...this.customArgs, ...rest };
+    this.customArgs = { ...this.customArgs, ...deepStripUndefined(rest) };
     if (where !== undefined) {
-      this.customWhere = combineAnd([where as object], this.customWhere);
+      const cleaned = isPlainObject(where) ? deepStripUndefined(where) : where;
+      const hasKeys = !isPlainObject(cleaned) || Object.keys(cleaned).length > 0;
+      if (hasKeys) {
+        this.customWhere = combineAnd([cleaned as object], this.customWhere);
+      }
     }
     return this;
   }
@@ -268,8 +336,8 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     if (where) {
       args.where = where;
     }
-    if (this.orderBy) {
-      args.orderBy = this.orderBy;
+    if (this.orderByArg) {
+      args.orderBy = this.orderByArg;
     }
     if (this.selectArg) {
       args.select = this.selectArg;
@@ -293,7 +361,9 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
         args.skip = cursorArgs.skip;
       }
     } else if (this.limit !== undefined) {
-      const offset = toOffsetArgs(this.page ?? 1, this.limit);
+      const page = this.page ?? 1;
+      this.assertSkipCap(page, this.limit);
+      const offset = toOffsetArgs(page, this.limit);
       args.take = offset.take;
       args.skip = offset.skip;
     }
@@ -353,11 +423,16 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * always describes the data actually returned. `count` and `findMany` run in
    * parallel.
    *
+   * Pass `{ includeTotal: false }` to skip the `COUNT` query entirely — `meta`
+   * then carries `total: null` / `totalPage: null` (audit G3).
+   *
    * Throws when cursor pagination is configured — offset meta cannot describe a
    * seek query, and the cursor over-fetch row would leak into `data` (audit F1).
    * Use {@link executeWithCursor} instead.
    */
-  async executeWithMeta(): Promise<{ meta: PaginationMeta; data: FindResultOf<D, TArgs> }> {
+  async executeWithMeta<O extends { includeTotal?: boolean } = { includeTotal?: boolean }>(
+    opts?: O,
+  ): Promise<{ meta: MetaOf<O>; data: FindResultOf<D, TArgs> }> {
     if (this.cursorActive) {
       throw new Error(
         'executeWithMeta() is offset-mode only: this builder has cursor pagination ' +
@@ -367,25 +442,39 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     if (this.limit === undefined) {
       this.paginate({ page: 1, limit: DEFAULT_PAGE_SIZE });
     }
+    // Fail before the COUNT goes out (strictNumbers + skip cap, audit F18).
+    this.assertSkipCap(this.page ?? 1, this.limit ?? DEFAULT_PAGE_SIZE);
     const offset = toOffsetArgs(this.page ?? 1, this.limit ?? DEFAULT_PAGE_SIZE);
+
+    if (opts?.includeTotal === false) {
+      const data = await this.execute();
+      return {
+        meta: { page: offset.page, limit: offset.limit, total: null, totalPage: null },
+        data,
+      } as { meta: MetaOf<O>; data: FindResultOf<D, TArgs> };
+    }
 
     const [total, data] = await Promise.all([this.count(), this.execute()]);
 
     return {
       meta: buildPaginationMeta(total, offset.page, offset.limit),
       data,
-    };
+    } as { meta: MetaOf<O>; data: FindResultOf<D, TArgs> };
   }
 
   /**
    * Executes a cursor-paginated query (see {@link cursorPaginate}) and returns
    * the page rows plus `next`/`prev` cursors. Rows are always returned in the
    * configured sort order, regardless of pagination `direction`.
+   *
+   * Throws when a `.select()` projection drops `cursorField` — the page cursors
+   * are derived from that field and would come out as `undefined` (audit F5).
    */
   async executeWithCursor(): Promise<{ meta: CursorMeta; data: FindResultOf<D, TArgs> }> {
     if (!this.cursorActive) {
       this.cursorPaginate({});
     }
+    this.assertCursorFieldProjected();
     const limit = this.cursorLimit ?? DEFAULT_PAGE_SIZE;
     const hadCursor = this.cursor !== undefined;
 
@@ -394,14 +483,88 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     ) => Promise<Record<string, unknown>[]>;
     const rows = await findMany(this.buildArgs());
 
+    // Strict mode spends one extra 1-row probe query to make the optimistic
+    // opposite edge exact (audit F10 / G9): forward pages probe the row before
+    // the cursor, backward pages the row after it. The probe mirrors the main
+    // query's `where`/`orderBy` — Prisma positions the cursor within the
+    // query's own sort order and filters.
+    let exactFlags: ExactCursorFlags | undefined;
+    if (this.cursorStrict && hadCursor) {
+      const probeArgs: Record<string, unknown> = {
+        take: this.cursorDirection === 'forward' ? -1 : 1,
+        cursor: { [this.cursorField]: this.cursor },
+        skip: 1,
+      };
+      const where = this.buildWhere();
+      if (where) {
+        probeArgs.where = where;
+      }
+      if (this.orderByArg) {
+        probeArgs.orderBy = this.orderByArg;
+      }
+      const probe = await findMany(probeArgs);
+      const hasEdgeRow = probe.length > 0;
+      exactFlags =
+        this.cursorDirection === 'forward'
+          ? { hasPrevPage: hasEdgeRow }
+          : { hasNextPage: hasEdgeRow };
+    }
+
     const { data, meta } = buildCursorPage(rows, {
       limit,
       direction: this.cursorDirection,
       cursorField: this.cursorField,
       hadCursor,
+      exactFlags,
     });
 
     return { meta, data: data as unknown as FindResultOf<D, TArgs> };
+  }
+
+  /** strictNumbers: out-of-range limits throw instead of clamping (audit F12). */
+  private assertLimit(limit: number | undefined): void {
+    if (!this.strictNumbers || limit === undefined) {
+      return;
+    }
+    if (!Number.isFinite(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
+      throw new Error(`strictNumbers: limit ${String(limit)} is outside [1, ${MAX_PAGE_SIZE}].`);
+    }
+  }
+
+  private assertPage(page: number | undefined): void {
+    if (!this.strictNumbers || page === undefined) {
+      return;
+    }
+    if (!Number.isFinite(page) || page < 1) {
+      throw new Error(`strictNumbers: page ${String(page)} must be a finite number >= 1.`);
+    }
+  }
+
+  /** strictNumbers: a computed skip beyond MAX_SKIP throws (audit F18). */
+  private assertSkipCap(page: number, limit: number): void {
+    if (!this.strictNumbers) {
+      return;
+    }
+    const skip = (clampPage(page) - 1) * clampLimit(limit);
+    if (skip > MAX_SKIP) {
+      throw new Error(
+        `strictNumbers: computed skip ${String(skip)} exceeds the ${String(MAX_SKIP)} cap — ` +
+          'use cursor pagination for deep pages.',
+      );
+    }
+  }
+
+  /** A projection without the cursor field would derive cursors from `undefined` (audit F5). */
+  private assertCursorFieldProjected(): void {
+    // `.custom({ select })` also feeds args.select when no `.select()` ran.
+    const select = (this.selectArg ?? this.customArgs.select) as
+      Record<string, unknown> | undefined;
+    if (select && !select[this.cursorField]) {
+      throw new Error(
+        `executeWithCursor(): the projection drops cursorField "${this.cursorField}", so page ` +
+          'cursors would be built from undefined. Keep the field in .select() or remove the projection.',
+      );
+    }
   }
 
   private buildWhere(): object | undefined {

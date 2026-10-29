@@ -6,7 +6,3 @@ coverage/
 *.log
 .env
 .env.*
-
-# Local store of the `skills` CLI (npx skills add/update); the committed copies
-# of the Prisma skills live in .claude/skills/.
-.agents/

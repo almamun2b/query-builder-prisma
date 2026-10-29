@@ -27,8 +27,7 @@ contracts.
 ### Added
 
 - Claude Code agent tooling: `design-rules-auditor` and `release-gate` agents,
-  the official Prisma Agent Skills (pinned in `skills-lock.json`), project MCP
-  servers (Prisma docs search, Context7), and a shared permission allowlist.
+  the project-authored `add-dialect` skill, and a shared permission allowlist.
 - Repo hygiene: CONTRIBUTING.md, SECURITY.md, PR/issue templates, CODEOWNERS,
   `package.json` `bugs`/`homepage`.
 
@@ -37,6 +36,9 @@ contracts.
 - `PLAN.md` (its surviving rules are single-sourced in ARCHITECTURE.md and
   AGENTS.md). Defect tracking moved out of the published docs; open limitations
   are documented in the README (`Known limitations`).
+- Prisma-specific agent tooling: the 10 installed `prisma-*` skills and
+  `.mcp.json` (Prisma docs MCP, Context7). This package imports nothing from
+  Prisma, so tooling for using Prisma added noise without value.
 
 ## [0.1.0] — 2026-10-29
 

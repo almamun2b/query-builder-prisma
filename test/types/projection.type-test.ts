@@ -57,6 +57,7 @@ interface UserFindArgs {
           select?: { id?: boolean; bio?: boolean };
           include?: { tags?: boolean | { select?: { label?: boolean } } };
         };
+    _count?: boolean | { select?: Record<string, boolean> };
   };
   orderBy?: Record<string, 'asc' | 'desc'>;
   skip?: number;
@@ -143,3 +144,25 @@ const _9: Expect<
 const _flatNullable = new QueryBuilder(userDelegate).include({ profile: true }).execute();
 const _10: Expect<Equal<Awaited<typeof _flatNullable>, (User & { profile: Profile | null })[]>> =
   true;
+
+// --- `_count` include widens in (audit F9 regression) ---
+
+// `_count: true` alongside a relation include: the count record is typed wide
+const _countInclude = new QueryBuilder(userDelegate)
+  .include({ posts: true, _count: true })
+  .execute();
+const _11: Expect<
+  Equal<Awaited<typeof _countInclude>, (User & { posts: Post[]; _count: Record<string, number> })[]>
+> = true;
+
+// `_count` with a nested select resolves to the same wide-but-correct record
+const _countSelect = new QueryBuilder(userDelegate)
+  .include({ _count: { select: { posts: true } } })
+  .execute();
+const _12: Expect<
+  Equal<Awaited<typeof _countSelect>, (User & { _count: Record<string, number> })[]>
+> = true;
+
+// include without `_count` gains no `_count` key (no phantom fields)
+const _noCount = new QueryBuilder(userDelegate).include({ posts: true }).execute();
+const _13: Expect<Equal<Awaited<typeof _noCount>, (User & { posts: Post[] })[]>> = true;

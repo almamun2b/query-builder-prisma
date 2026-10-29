@@ -42,13 +42,10 @@ the README "Behavior contracts" section in the same change.
 - `.claude/agents/design-rules-auditor` — run after non-trivial `src/`/`test/`
   changes; enforces the checklist above.
 - `.claude/agents/release-gate` — full pre-publish gate before version bumps.
-- `.claude/skills/prisma-*` — the official Prisma Agent Skills (pinned in
-  `skills-lock.json`; refresh with `npx skills update -p`). They are reference
-  material; the zero-coupling rule overrides anything they suggest.
-- `.mcp.json` wires the official Prisma MCP server (`https://mcp.prisma.io/mcp` —
-  docs search; OAuth sign-in on first connect) and Context7 (no auth). No MCP?
-  Prisma docs are also at `https://www.prisma.io/docs/llms.txt`, or append
-  `.md` to any docs URL.
+- `.claude/skills/add-dialect` — project-authored recipe for adding a database
+  dialect without touching `src/core/`.
+- No Prisma-specific skills or MCP servers: the package imports nothing from
+  Prisma, so there is nothing for such tooling to do here.
 
 ## Releases
 

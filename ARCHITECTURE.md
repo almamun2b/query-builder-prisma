@@ -80,7 +80,7 @@ anything not re-exported there does not exist for consumers.
 | `core/query-builder.ts`  | The fluent facade. Owns all mutable state; the only module that calls the delegate.                          |
 | `dialects/capabilities.ts` | Capability sets per database (pure data).                                                                 |
 | `dialects/registry.ts`   | `registerDialect`, `configureQueryBuilder`, dialect resolution order.                                        |
-| `dialects/detect.ts`     | Opt-in auto-detect hook; v0 always returns `undefined` → falls through to `'universal'`.                     |
+| `dialects/detect.ts`     | Built-in auto-detect hook (wired into the resolution order); v0 always returns `undefined` → falls through to `'universal'`. |
 
 ## The four invariants
 
@@ -122,10 +122,13 @@ Cursor mode wins over offset mode when both are configured.
 - The builder accumulates state per instance: **one builder per query;
   instances are cheap**. Sharing an instance across concurrent requests mixes
   conditions — preserve this contract in every framework recipe.
-- Global dialect config (`configureQueryBuilder`) lives in module scope, so a
-  bundler loading this package as both ESM and CJS can create two config
-  instances (dual-package hazard). The reliable path is the per-builder
-  `dialect` option. Never add more module-scope mutable state.
+- Global dialect config (`configureQueryBuilder`, the detector, the capability
+  registry) lives on `globalThis` under the registered symbol
+  `Symbol.for('almamun2b.prisma-query-builder.dialect-state')`, so ESM and CJS
+  copies of the package converge on ONE config (audit F7 — the former
+  module-scope state had a dual-package hazard). The per-builder `dialect`
+  option remains the recommended path. Never add module-scope mutable state;
+  anything genuinely global must go through this one shared store.
 
 ## The type engine in one page
 
@@ -171,11 +174,14 @@ standing proof of invariant 1. A change is done only when `npm run verify`
 
 ## Known gaps and change discipline
 
-There is no defect register; known gaps live in the README (`Known limitations`
+The consolidated audit register lives in `docs/AUDIT.md` (internal); the
+user-facing subset of open gaps is mirrored in the README (`Known limitations`
 and `Behavior contracts`). The former HIGH defects — cursor/offset meta conflict,
 `custom({ where })` replacing the `initialArgs` seed, nested-include types
-narrower than runtime truth — are fixed with regression tests. When touching
-code:
+narrower than runtime truth — and the P1/P2 audit findings (cursor
+serialization, `sortBy` dot paths, `_count` typing, prototype hardening,
+strict pagination modes, `includeTotal`, the `globalThis` dialect store, …)
+are fixed with regression tests. When touching code:
 
 - check the change does not extend a documented limitation's code path;
 - add a regression test when you fix a limitation;

@@ -76,19 +76,11 @@ dual ESM+CJS). Details and layer boundaries: [ARCHITECTURE.md](./ARCHITECTURE.md
   changes against the invariants and the README contracts (run after non-trivial
   changes); `release-gate` — full pre-publish gate (run before any version bump
   or publish; never publishes itself).
-- **Skills** (`.claude/skills/`): `add-dialect` is project-authored. The
-  `prisma-*` skills are the **official Prisma Agent Skills**, installed with
-  `npx skills add prisma/skills` and pinned in `skills-lock.json` — reference
-  material, most useful for mirroring Prisma's `select`/`include` semantics
-  precisely in the projection engine. **Guardrail: invariant 1 overrides any
-  skill content** — a skill must never cause a Prisma import, dependency, or
-  generated-client reference in `src/` or `test/`. Refresh with
-  `npx skills update -p`.
-- **MCP** (`.mcp.json`, project scope): `prisma` — the official remote server
-  (`https://mcp.prisma.io/mcp`; docs search is the relevant tool here, OAuth
-  sign-in on first connect) and `context7` — general library docs, no auth.
-  Zero-setup fallback for Prisma docs: `https://www.prisma.io/docs/llms.txt` or
-  append `.md` to any docs URL.
+- **Skills** (`.claude/skills/`): `add-dialect` — project-authored recipe for
+  adding a database without touching `src/core/`. No Prisma-specific skills or
+  MCP servers are configured: this package imports nothing from Prisma, so
+  tooling for *using* Prisma has no place here (invariant 1 applies to agent
+  tooling too).
 - **Shared settings** (`.claude/settings.json`): permission allowlist for the
   verify/test/lint/typecheck/build commands, so agents don't re-prompt on the
   standard gate.

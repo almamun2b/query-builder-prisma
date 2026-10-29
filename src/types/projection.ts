@@ -9,6 +9,7 @@
  * Degradation rule: when Prisma's exact semantics can't be mirrored, the result
  * is the *wider but correct* type — never a wrong one.
  */
+import type { PrismaModelDelegate, RowElementOf } from './delegate';
 
 /** Keys of a select/include spec that are "on" (`true` or a nested spec). */
 type TruthyKeys<S> = {
@@ -25,10 +26,14 @@ export type ApplySelect<Row, S> = {
 
 /**
  * Apply an `include` spec to a row: all base fields stay, included relations are
- * projected (recursively when the include carries a nested `select`).
+ * projected (recursively when the include carries a nested `select`), and a
+ * truthy `_count` widens in as `Record<string, number>` (audit F9 — the engine
+ * cannot know the selected relation keys, so it degrades wide, never wrong).
  */
 export type ApplyInclude<Row, I> = Row & {
-  [K in TruthyKeys<I> & keyof Row]: ProjectField<Row[K], I[K]>;
+  [K in TruthyKeys<I> & (keyof Row | '_count')]: K extends '_count'
+    ? Record<string, number>
+    : ProjectField<Row[K & keyof Row], I[K]>;
 };
 
 /** Project one field (`Field`) according to its select/include `Spec`. */
@@ -78,11 +83,7 @@ export type ApplyProjection<Row, TArgs> = TArgs extends { select: infer S }
     : Row;
 
 /** The array a builder's `execute()` resolves to for the given delegate + args. */
-export type FindResultOf<D, TArgs> = ApplyProjection<
-  D extends { findMany: (...args: never[]) => Promise<infer Rows> }
-    ? Rows extends readonly (infer E)[]
-      ? E
-      : never
-    : never,
+export type FindResultOf<D extends PrismaModelDelegate, TArgs> = ApplyProjection<
+  RowElementOf<D>,
   TArgs
 >[];

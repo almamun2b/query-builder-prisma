@@ -23,6 +23,17 @@ export interface PaginationMeta {
   totalPage: number;
 }
 
+/**
+ * Metadata shape when `executeWithMeta({ includeTotal: false })` skips the
+ * `COUNT` query — the totals are unknown, not zero (audit G3).
+ */
+export interface PaginationMetaNoTotal {
+  page: number;
+  limit: number;
+  total: null;
+  totalPage: null;
+}
+
 /** Cursor pagination metadata returned by `executeWithCursor()`. */
 export interface CursorMeta {
   limit: number;

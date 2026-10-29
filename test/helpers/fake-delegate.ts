@@ -14,7 +14,7 @@ export interface FakeFindArgs {
   where?: Record<string, unknown>;
   select?: Record<string, boolean | object>;
   include?: Record<string, boolean | object>;
-  orderBy?: Record<string, 'asc' | 'desc'>;
+  orderBy?: Record<string, 'asc' | 'desc'> | Record<string, 'asc' | 'desc'>[];
   skip?: number;
   take?: number;
   cursor?: Record<string, unknown>;
@@ -23,6 +23,8 @@ export interface FakeFindArgs {
 
 export interface RecordedArgs {
   findManyArgs?: FakeFindArgs;
+  /** Every `findMany` call in order — strict cursor mode issues a probe call (audit F10). */
+  findManyCalls: (FakeFindArgs | undefined)[];
   countArgs?: Record<string, unknown>;
 }
 
@@ -35,6 +37,19 @@ export function fakeRows(n: number): FakeRow[] {
   }));
 }
 
+/**
+ * Cursor-cell match with Prisma's DateTime coercion: ISO strings are accepted
+ * for Date cells (this is what makes serialized cursors round-trippable — the
+ * exact property audit F4 guarantees).
+ */
+function matchesCursorCell(row: FakeRow, field: string, value: unknown): boolean {
+  const cell: unknown = (row as unknown as Record<string, unknown>)[field];
+  if (cell instanceof Date) {
+    return cell.toISOString() === String(value);
+  }
+  return cell === value;
+}
+
 export function createFakeDelegate(rows: FakeRow[] = []): {
   delegate: {
     findMany: (args?: FakeFindArgs) => Promise<FakeRow[]>;
@@ -42,16 +57,41 @@ export function createFakeDelegate(rows: FakeRow[] = []): {
   };
   recorded: RecordedArgs;
 } {
-  const recorded: RecordedArgs = {};
+  const recorded: RecordedArgs = { findManyCalls: [] };
   const delegate = {
     findMany: async (args?: FakeFindArgs): Promise<FakeRow[]> => {
       recorded.findManyArgs = args;
-      // Emulate Prisma: apply skip, then take (absolute value for backward seek).
+      recorded.findManyCalls.push(args);
+
       const skip = typeof args?.skip === 'number' ? args.skip : 0;
-      const take = typeof args?.take === 'number' ? Math.abs(args.take) : undefined;
+      const take = typeof args?.take === 'number' ? args.take : undefined;
+
+      // Emulate Prisma cursor semantics: the cursor anchors AT the matching
+      // row, `skip: 1` excludes the cursor row, positive take walks forward,
+      // negative take walks backward (nearest first, returned in seek order —
+      // the builder re-reverses backward pages itself).
+      const cursorArg = args?.cursor;
+      const firstCursor = cursorArg ? Object.entries(cursorArg)[0] : undefined;
+      if (firstCursor !== undefined) {
+        const [field, value] = firstCursor;
+        const anchor = rows.findIndex((row) => matchesCursorCell(row, field, value));
+        if (anchor === -1) {
+          return [];
+        }
+        if (take !== undefined && take < 0) {
+          return rows.slice(0, anchor).reverse().slice(0, Math.abs(take));
+        }
+        const after = rows.slice(anchor + Math.max(skip, 1));
+        return take !== undefined ? after.slice(0, take) : after;
+      }
+
+      // Emulate Prisma: apply skip, then take; negative take returns the last
+      // rows in reversed (seek) order.
       let out = rows;
       if (skip > 0) out = out.slice(skip);
-      if (take !== undefined) out = out.slice(0, take);
+      if (take !== undefined) {
+        out = take < 0 ? [...out].reverse().slice(0, Math.abs(take)) : out.slice(0, take);
+      }
       return out;
     },
     count: async (args?: Record<string, unknown>): Promise<number> => {

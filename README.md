@@ -46,8 +46,14 @@ const { meta, data } = await new QueryBuilder(prisma.user)
 import { configureQueryBuilder } from '@almamun2b/prisma-query-builder';
 
 configureQueryBuilder({ dialect: 'postgres' });           // global default
-new QueryBuilder(prisma.user, { dialect: 'mysql' });      // per-builder override
+new QueryBuilder(prisma.user, { dialect: 'mysql' });      // per-builder override (recommended)
 ```
+
+The global config state is shared through `globalThis` under a registered symbol, so
+bundler graphs that load this package as both ESM and CJS still see ONE config.
+The per-builder option stays the recommended path; unknown dialect names resolve
+to `'universal'` (reported name included — the name never lies about the applied
+capabilities).
 
 ## Behavior contracts
 
@@ -55,34 +61,62 @@ Semantics you can build on (the tests pin these):
 
 - **Precedence** — explicit methods always win over `custom()` args, regardless of
   call order: `.select(X)` beats `custom({ select: Y })`;
-  `.paginate(...)`/`.cursorPaginate(...)` beat `custom({ take })`.
+  `.paginate(...)`/`.cursorPaginate(...)` beat `custom({ take })`;
+  `.sortBy()`/`.orderBy()` beat `custom({ orderBy })`.
 - **`where` assembly** — conditions from `.search/.filter/.range/.where` are
   AND-ed, a seeded `initialArgs.where` is AND-ed in front of them, and
   `.custom({ where })` is AND-ed with the seed and previous custom `where`s —
   it never replaces them.
+- **`custom()` strips `undefined`** — at any depth, so
+  `custom({ distinct: undefined })` cannot overwrite an earlier value. Keys
+  named `__proto__`, `constructor` or `prototype` are refused (never written)
+  in `custom()`, `filter()` and dot-path expansion.
+- **Sorting** — `.sortBy()` is single-key sugar and expands dot paths like
+  `.range()` (`'avatar.size'` → `{ avatar: { size: 'desc' } }`); `.orderBy()`
+  takes the full Prisma shape verbatim (arrays for multi-key, nested relation
+  orders). The latest of the two calls wins.
 - **Cursor beats offset** — when both `.paginate()` and `.cursorPaginate()` are
   configured, cursor mode wins. `executeWithCursor()` always returns rows in the
   configured sort order, regardless of `direction`.
 - **`executeWithMeta()` is offset-mode only** — it throws if `.cursorPaginate()`
   was configured (offset meta cannot describe a seek query); use
   `.executeWithCursor()` in cursor mode.
-- **Cursor flags are optimistic** — `hasNextPage`/`hasPrevPage` are based on a
-  one-row over-fetch and can rarely claim a page exists that turns out empty.
-- **Clamping** — `limit` is clamped silently to `[1, 1000]`; pages below 1 become
-  page 1.
+- **Cursor serialization** — `cursorPaginate({ cursor })` accepts a string,
+  number or `Date`; `Date` values (and `Date` cursor fields) serialize to
+  ISO-8601, so cursors are round-trippable and locale/TZ-independent.
+- **Cursor flags are optimistic by default** — `hasNextPage`/`hasPrevPage` come
+  from a one-row over-fetch and can rarely claim a page exists that turns out
+  empty. `cursorPaginate({ strict: true })` spends one extra 1-row probe query
+  to make both flags exact.
+- **Cursor projection guard** — `executeWithCursor()` throws when a `.select()`
+  projection drops `cursorField` (cursors would be built from `undefined`).
+- **Clamping** — `limit` is clamped silently to `[1, 1000]`; pages below 1
+  become page 1; computed `skip` is capped at `100_000` (deep access → cursor
+  pagination). With `new QueryBuilder(delegate, { strictNumbers: true })` all of
+  these throw instead of clamping.
+- **`includeTotal`** — `executeWithMeta({ includeTotal: false })` skips the
+  `COUNT` query; `meta` then carries `total: null` / `totalPage: null`.
 - **Defaults** — `executeWithMeta()` without pagination defaults to page 1,
   limit 10 so `meta` always describes the returned data.
 - **`.first()`** — forces `take: 1` and drops `skip`/`cursor`: it returns the
   first row of the whole result set, not of a configured page.
-- **`search()` fields** — pass scalar string fields only; relation keys compile
-  but throw at Prisma runtime.
+- **`search()`** — pass scalar string fields only (relation keys compile but
+  throw at Prisma runtime); empty or whitespace-only `searchText` adds no
+  condition; each `OR` arm gets its own match object.
+- **`range()` reaches to-one paths only** — dot paths expand for to-one
+  relations and nested objects; filtering a to-many relation needs
+  `.custom({ where: { posts: { some: { ... } } } })`.
+- **`_count` is typed wide** — `include({ _count: true })` widens the result
+  type with `_count: Record<string, number>` (present, correct keys are unknown
+  statically); the `prisma.user.findMany(qb.buildArgs())` passthrough recovers
+  the exact per-relation shape.
 - **`cursorField`** — must be unique and sequentially ordered (pair it with a
   matching `.sortBy()`); duplicates paginate wrong silently.
 - **One builder per query** — instances are cheap; never share one across
-  concurrent requests.
-- **Dialect config** — the per-builder `dialect` option is the reliable path;
-  global `configureQueryBuilder()` can be invisible when a bundler loads this
-  package as both ESM and CJS.
+  concurrent requests. Framework recipes: [docs/framework-recipes.md](./docs/framework-recipes.md).
+- **Dialect config** — global config state is shared via `globalThis`, so ESM+CJS
+  dual loading sees one config; the per-builder `dialect` option remains the
+  recommended path, and unknown names resolve to `'universal'` (name included).
 
 The former HIGH-severity footguns (seed-`where` replacement, `executeWithMeta()`
 under cursor mode, nested-include type narrowing) are fixed and
@@ -92,21 +126,10 @@ regression-tested. Remaining limitations are documented below.
 
 Open and documented rather than hidden — none produces a silently wrong result:
 
-- **Date cursors are lossy** — a `Date` `cursorField` is stringified with
-  `String()`; the cursor is locale/TZ-dependent and not round-trippable. Use a
-  number or string cursor field for now.
-- **`.select()` must keep the `cursorField`** — a projection without it yields a
-  literal `"undefined"` cursor; the next seek would target a nonexistent row.
-- **`sortBy()` takes top-level fields only** — dot paths are not expanded
-  (`.range()` does expand them); relation-field sorts need `.custom({ orderBy })`.
 - **Plain `.execute()` after `.cursorPaginate()`** returns raw seek-order rows
   including the one-row over-fetch — use `.executeWithCursor()` for trimmed,
-  sort-ordered pages.
-- **`_count` is missing from projected types** — `include({ _count: true })`
-  works at runtime but the type omits it; the
-  `prisma.user.findMany(qb.buildArgs())` passthrough recovers exact inference.
-- **Offset `skip` is uncapped** — `page × limit` is sent as-is; prefer cursor
-  pagination for deep pages.
+  sort-ordered pages (kept as raw-passthrough semantics by design; the
+  `buildArgs()` passthrough is always available).
 
 ## Development
 
@@ -126,6 +149,7 @@ in [CONTRIBUTING.md](./CONTRIBUTING.md) and [AGENTS.md](./AGENTS.md).
 
 Docs: [ARCHITECTURE.md](./ARCHITECTURE.md) (design + boundaries),
 [AGENTS.md](./AGENTS.md) (agent/contributor rules),
-[CONTRIBUTING.md](./CONTRIBUTING.md) (how to contribute).
+[CONTRIBUTING.md](./CONTRIBUTING.md) (how to contribute),
+[framework-recipes](./docs/framework-recipes.md) (Next.js / NestJS wiring).
 
 > **Note:** the npm scope `@almamun2b/` is live on npm.
