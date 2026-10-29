@@ -9,5 +9,10 @@
       "Bash(npm run build)",
       "Bash(npx vitest run:*)"
     ]
-  }
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false
 }

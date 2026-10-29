@@ -97,7 +97,11 @@ dual ESM+CJS). Details and layer boundaries: [ARCHITECTURE.md](./ARCHITECTURE.md
   `Expect<Equal>` for type shapes.
 - Git attribution: commit as the user's global git settings — never add
   `Co-Authored-By: Claude …` or "Generated with Claude Code" trailers to commits
-  or PRs, and never set author/committer to Claude.
+  or PRs, and never set author/committer to Claude. `.claude/settings.json` also
+  empties `attribution`, which overrides the harness default. If the configured
+  identity turns out to be Claude (e.g. a fresh container), take the owner's from
+  `git log -1 --format='%an <%ae>' main` and pass it with
+  `git -c user.name=… -c user.email=… commit`.
 
 ## Review checklist (every change)
 
