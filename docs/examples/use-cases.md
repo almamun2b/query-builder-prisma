@@ -5,6 +5,29 @@ a Prisma client with `User`/`Post` models (`id`, `email`, `status`, `role`,
 `createdAt`, `deletedAt`, `tenantId`, an `avatar` relation, and a to-many
 `posts` relation) — adapt names to your schema.
 
+## Setup: configure the dialect once
+
+The examples below pass `{ dialect: 'postgresql' }` per builder so each
+snippet is self-contained. In a real app, configure the dialect once at
+startup — next to where you create `PrismaClient` — and drop the option from
+every call site:
+
+```ts
+// src/db.ts — the module that exports your Prisma client
+import { PrismaClient } from '@prisma/client';
+import { configQueryBuilder } from 'query-builder-prisma';
+
+export const prisma = new PrismaClient();
+
+configQueryBuilder({ dialect: 'postgresql' });
+```
+
+The dialect is resolved when a dialect-aware method runs (e.g. `.search()`),
+not at builder construction, so any startup placement before the first request
+works. Per-builder `{ dialect }` remains as the override for the rare process
+that talks to databases with different providers. Details:
+[Dialects — where to put the global config](../guides/dialects.md#where-to-put-the-global-config).
+
 ## 1. Paginated admin table from REST query params
 
 The classic listing endpoint: search box, dropdown filters, date range,

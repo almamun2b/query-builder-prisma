@@ -36,6 +36,31 @@ An unregistered/unknown name resolves to `'universal'`, and the reported
 `name` reflects that — the name never lies about the capabilities actually
 applied.
 
+### Where to put the global config
+
+Once, at application startup. The natural spot is the module that creates your
+`PrismaClient` — import order then guarantees the config exists before any
+query:
+
+```ts
+// src/db.ts — the module that exports your Prisma client (same in any framework)
+import { PrismaClient } from '@prisma/client';
+import { configQueryBuilder } from 'query-builder-prisma';
+
+export const prisma = new PrismaClient();
+
+configQueryBuilder({ dialect: 'postgresql' });
+```
+
+The dialect is resolved when a dialect-aware method runs (e.g. `.search()`),
+not at builder construction — so anything after startup picks it up, and call
+sites need no per-builder `{ dialect }`.
+
+It is process-global state (shared via `globalThis`, see below). In the rare
+app that talks to two databases with different providers from one process,
+keep the global for the default and the per-builder `dialect` override for the
+minority.
+
 ## Built-in capability sets
 
 | Dialect       | `caseInsensitiveMode` | `caseInsensitiveCollation` |

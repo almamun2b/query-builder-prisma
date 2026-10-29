@@ -95,6 +95,9 @@ dual ESM+CJS). Details and layer boundaries: [ARCHITECTURE.md](./ARCHITECTURE.md
 - Tests read like the existing suites: recorded-args assertions against the fake
   delegate for "what was sent", direct calls for pure functions, strict
   `Expect<Equal>` for type shapes.
+- Git attribution: commit as the user's global git settings — never add
+  `Co-Authored-By: Claude …` or "Generated with Claude Code" trailers to commits
+  or PRs, and never set author/committer to Claude.
 
 ## Review checklist (every change)
 
