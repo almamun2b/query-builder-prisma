@@ -25,8 +25,9 @@ product's entire moat — every rule below protects it.
   config in `.releaserc.json`) publishes on every push to `main` whose
   Conventional Commits warrant a version — `fix:` → patch, `feat:` → minor,
   `feat!:`/`BREAKING CHANGE:` → major; `chore:`/`docs:`/`ci:`/`test:` never
-  release. Never run `npm publish` or `npm version` by hand; the
-  `chore(release): vX.Y.Z [skip ci]` commit on `main` is bot-authored.
+  release. Never run `npm publish` or `npm version` by hand. `main` is protected
+  (PR-only), so the release bot commits nothing back: the latest `v*` tag / npm
+  is the current version and `package.json` on `main` is not bumped.
 
 No Prisma install or database is ever required. All tests use hand-written fake
 delegates (`test/helpers/fake-delegate.ts`) — this is deliberate: the suite

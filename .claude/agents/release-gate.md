@@ -24,8 +24,9 @@ never run a real `npm publish`.
    `github.com/almamun2b/query-builder-prisma`; confirm `package.json`
    `name` and `repository.url` agree with the README.
 5. **Version hygiene** — `git status --short` must be clean or contain only
-   intended release changes, and `package.json` version must not match any
-   existing git tag (`git tag -l`).
+   intended release changes, and `package.json` on `main` is not bumped by
+   the release bot (it lags the latest `v*` tag by design); a manual bump must
+   not match any existing git tag (`git tag -l`).
 6. **Known limitations** — review the README `Known limitations` section. If
    any HIGH-severity limitation (a type that lies, silent data-loss behavior)
    is still present, print a loud warning: per the design rules those block a

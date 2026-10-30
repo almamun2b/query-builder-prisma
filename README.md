@@ -255,8 +255,9 @@ see `.github/workflows/release.yml`):
 | `feat!:` / `BREAKING CHANGE:` footer | major   | 0.2.0 → 1.0.0 |
 | `chore:` / `docs:` / `ci:` / `test:` | none    | no release    |
 
-A release bumps `package.json`, publishes to npm with provenance (the full
-verify pipeline runs first), pushes the `v*` tag, and creates the GitHub
+A release publishes the new version to npm with provenance (the full
+verify pipeline runs first; `package.json` on `main` is not bumped — the `v*`
+tag is the version source of truth), pushes the `v*` tag, and creates the GitHub
 Release with generated notes. [`CHANGELOG.md`](./CHANGELOG.md) stays
 hand-maintained; the auto-generated notes live on
 [GitHub Releases](https://github.com/almamun2b/query-builder-prisma/releases).
