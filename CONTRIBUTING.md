@@ -31,7 +31,7 @@ Read [AGENTS.md](./AGENTS.md) (rules + review checklist) and
 - `test/unit/` — runtime behavior against recorded fake delegates;
   `test/types/` — compile-time projection shapes. Fixtures in
   `test/helpers/fake-delegate.ts` are hand-written and Prisma-free on purpose.
-- `dist/` and `builder-old/` are never source — don't edit or import from them.
+- `dist/` is build output, never source — don't edit or import from it.
 
 Docs are single-sourced: design in ARCHITECTURE.md, working rules in AGENTS.md,
 behavior contracts and known limitations in the README. Behavior changes update

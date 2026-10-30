@@ -13,8 +13,8 @@ live in the README (`Known limitations`).
 
 ## Repo-specific gotchas
 
-- Work only in `src/` and `test/`. `dist/` (build output) and `builder-old/`
-  (archived prototype) are never source — do not edit or import from them.
+- Work only in `src/` and `test/`. `dist/` (build output) is never source —
+  do not edit or import from it.
 - Type tests (`test/types/*.type-test.ts`) are compiled, not run: add them for
   any projection/type change and confirm with `npm run typecheck`. vitest will
   not pick them up.

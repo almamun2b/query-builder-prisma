@@ -70,7 +70,7 @@ app.get('/feed', async (req, res) => {
     .where({ status: 'PUBLISHED' })
     .sortBy({ sortBy: 'createdAt', sortOrder: 'desc' })
     .cursorPaginate({
-      cursor: req.query.cursor,          // undefined on the first request
+      cursor: req.query.cursor, // undefined on the first request
       cursorField: 'createdAt',
       limit: 10,
     })
@@ -83,7 +83,7 @@ app.get('/feed', async (req, res) => {
 ## 3. Backward paging ("load newer", history back-fill)
 
 The same cursor walks both ways. `direction: 'backward'` fetches the rows
-*before* the cursor while **output stays in configured sort order**, so the
+_before_ the cursor while **output stays in configured sort order**, so the
 client can prepend the chunk without reversing it.
 
 ```ts
@@ -91,15 +91,15 @@ const page = await new QueryBuilder(prisma.message)
   .where({ channelId })
   .sortBy({ sortBy: 'createdAt', sortOrder: 'desc' })
   .cursorPaginate({
-    cursor: oldestLoaded.createdAt,      // ISO string round-trips (Date → ISO-8601)
+    cursor: oldestLoaded.createdAt, // ISO string round-trips (Date → ISO-8601)
     cursorField: 'createdAt',
     direction: 'backward',
     limit: 30,
-    strict: true,                        // exact hasPrevPage — no dead "load older" button
+    strict: true, // exact hasPrevPage — no dead "load older" button
   })
   .executeWithCursor();
 
-prependToHistory(page.data);             // already oldest → newest
+prependToHistory(page.data); // already oldest → newest
 ```
 
 ## 4. Relay-style connection shape
@@ -163,7 +163,7 @@ export const tenantUsers = (tenantId: string) =>
 
 const { data } = await tenantUsers(session.tenantId)
   .filter({ role: 'EDITOR' })
-  .custom({ where: { verified: true } })   // AND-ed with the seed, never replaces it
+  .custom({ where: { verified: true } }) // AND-ed with the seed, never replaces it
   .orderBy([{ role: 'asc' }, { createdAt: 'desc' }])
   .execute();
 ```
@@ -177,7 +177,7 @@ use `.where()` with relation operators.
 const { meta, rows } = await new QueryBuilder(prisma.user, { dialect: 'postgresql' })
   .range({
     createdAt: { from: monthStart, to: monthEnd },
-    'avatar.size': { from: 1024 },                    // avatar is to-one
+    'avatar.size': { from: 1024 }, // avatar is to-one
   })
   .where({ posts: { some: { publishedAt: { gte: monthStart } } } }) // posts is to-many
   .sortBy({ sortBy: 'createdAt' })
@@ -259,4 +259,4 @@ the same rows with the wider-but-correct `_count` typing.
 ## Related
 
 - [Framework recipes](../framework-recipes.md) — Next.js, NestJS, Express, edge
-- [Guides](../index.md#guides) — the building blocks used above
+- [Guides](../readme.md#guides) — the building blocks used above

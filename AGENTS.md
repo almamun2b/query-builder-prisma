@@ -73,8 +73,7 @@ dual ESM+CJS). Details and layer boundaries: [ARCHITECTURE.md](./ARCHITECTURE.md
   includes `test/**/*.test.ts`, so type tests are verified by
   `npm run typecheck` (tsconfig includes `test/`). They use the hand-rolled
   `Expect<Equal<A, B>>` pattern — there is no `expect-type` dependency.
-- `dist/` is build output; `builder-old/` is the archived prototype this package
-  was extracted from. Neither is source — do not edit or import from them.
+- `dist/` is build output — never source; do not edit or import from it.
 
 ## AI agent tooling (Claude Code)
 

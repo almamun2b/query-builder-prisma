@@ -54,7 +54,7 @@ runtime dependencies.
 |                                                  |                                                                                     |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | [Getting started](./docs/getting-started.md)     | install, first query, imports                                                       |
-| [Guides](./docs/index.md#guides)                 | filtering, sorting, both pagination modes, projections, dialects, advanced patterns |
+| [Guides](./docs/readme.md#guides)                | filtering, sorting, both pagination modes, projections, dialects, advanced patterns |
 | [API reference](./docs/api/query-builder.md)     | every method, type and function                                                     |
 | [Use cases](./docs/examples/use-cases.md)        | end-to-end scenarios                                                                |
 | [Framework recipes](./docs/framework-recipes.md) | Next.js, NestJS, Express, edge runtimes                                             |
@@ -241,7 +241,6 @@ npm test         # unit tests — fake delegates, zero Prisma required
 - `src/dialects` — capability registry, per-DB capabilities, auto-detect hook
 - `src/types` — structural delegate contracts + projection type engine
 - `test/types` — compile-time projection tests (run by `npm run typecheck`)
-- `builder-old/` — the original prototype this package was extracted from (reference only)
 
 ### Releases
 
@@ -266,7 +265,7 @@ A failed release can be re-run from the Actions tab (`workflow_dispatch`).
 ### Links
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — design, boundaries, invariants
-- [docs/index.md](./docs/index.md) — full documentation hub
+- [docs/readme.md](./docs/readme.md) — full documentation hub
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — how to contribute
 - [SECURITY.md](./SECURITY.md) — vulnerability reporting
 - [CHANGELOG.md](./CHANGELOG.md) — release history
