@@ -30,7 +30,7 @@ interface DialectState {
 const STATE_KEY = Symbol.for('query-builder-prisma.dialect-state');
 
 function state(): DialectState {
-  const host = globalThis as typeof globalThis & { [STATE_KEY]?: DialectState };
+  const host = globalThis as unknown as Record<symbol, DialectState | undefined>;
   return (host[STATE_KEY] ??= {
     registry: new Map(Object.entries(DIALECT_CAPABILITIES) as [string, DialectCapabilities][]),
     globalDialect: undefined,
@@ -70,7 +70,7 @@ export interface ResolvedDialect {
  * name resolves to `'universal'` — the reported name never lies about the
  * capabilities actually applied (audit G8).
  */
-export function resolveDialect(explicit?: string | undefined): ResolvedDialect {
+export function resolveDialect(explicit?: string): ResolvedDialect {
   const s = state();
   const requested = explicit ?? s.globalDialect ?? s.detector?.() ?? detectDialect() ?? 'universal';
   const capabilities = s.registry.get(requested);

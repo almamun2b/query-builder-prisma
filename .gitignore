@@ -7,3 +7,5 @@ coverage/
 .env
 .env.*
 .husky/_/
+*.tgz
+.claude/settings.local.json

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-parameters -- canonical Equal<> identity trick */
 import { QueryBuilder } from '../../src/core/query-builder';
 import type { PrismaModelDelegate } from '../../src/types/delegate';
 import type { FindResultOf } from '../../src/types/projection';
@@ -72,9 +73,8 @@ interface UserDelegate extends PrismaModelDelegate {
 declare const userDelegate: UserDelegate;
 
 // --- strict type-equality helpers (verified by `npm run typecheck`) ---
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
-  ? true
-  : false;
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Expect<T extends true> = T;
 
 // no projection => full row type
@@ -96,9 +96,7 @@ const _3: Expect<Equal<Awaited<typeof _nested>, { id: string; posts: { title: st
 const _included = new QueryBuilder(userDelegate)
   .include({ posts: { select: { id: true } } })
   .execute();
-const _4: Expect<
-  Equal<Awaited<typeof _included>, (User & { posts: { id: string }[] })[]>
-> = true;
+const _4: Expect<Equal<Awaited<typeof _included>, (User & { posts: { id: string }[] })[]>> = true;
 
 // nullable field selection keeps nullability
 const _withName = new QueryBuilder(userDelegate).select({ id: true, name: true }).execute();

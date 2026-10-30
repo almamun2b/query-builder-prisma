@@ -38,7 +38,9 @@ export function deepStripUndefined(obj: Record<string, unknown>): Record<string,
     result[key] = isDeepStrippable(value)
       ? deepStripUndefined(value)
       : Array.isArray(value)
-        ? value.map((item) => (isDeepStrippable(item) ? deepStripUndefined(item) : item))
+        ? (value as unknown[]).map((item) =>
+            isDeepStrippable(item) ? deepStripUndefined(item) : item,
+          )
         : value;
   }
   return result;

@@ -3,8 +3,18 @@ import { QueryBuilder } from '../../src/core/query-builder';
 import { registerDialect, resetDialectConfig } from '../../src/dialects/registry';
 import type { Dialect } from '../../src/dialects/capabilities';
 import { createFakeDelegate, fakeRows } from '../helpers/fake-delegate';
+import type { RecordedArgs } from '../helpers/fake-delegate';
 
-afterEach(() => resetDialectConfig());
+type Clause = Record<string, unknown>;
+
+/** The `OR` arms of the recorded `where` (search output). */
+function orArms(recorded: RecordedArgs): Record<string, Clause>[] {
+  return (recorded.findManyArgs?.where as { OR: Record<string, Clause>[] }).OR;
+}
+
+afterEach(() => {
+  resetDialectConfig();
+});
 
 describe('QueryBuilder conditions', () => {
   it('search adds OR contains WITHOUT mode on the universal dialect', async () => {
@@ -12,10 +22,9 @@ describe('QueryBuilder conditions', () => {
     await new QueryBuilder(delegate)
       .search({ searchText: 'jo', fields: ['email', 'id'] })
       .execute();
-    const where = recorded.findManyArgs?.where as Record<string, any>;
-    const clause = where.OR[0].email;
+    const clause = orArms(recorded)[0]?.email;
     expect(clause).toEqual({ contains: 'jo' });
-    expect(clause.mode).toBeUndefined();
+    expect(clause?.mode).toBeUndefined();
   });
 
   it('search adds mode insensitive for postgres', async () => {
@@ -23,8 +32,7 @@ describe('QueryBuilder conditions', () => {
     await new QueryBuilder(delegate, { dialect: 'postgresql' })
       .search({ searchText: 'jo', fields: ['email'] })
       .execute();
-    const where = recorded.findManyArgs?.where as Record<string, any>;
-    expect(where.OR[0].email).toEqual({ contains: 'jo', mode: 'insensitive' });
+    expect(orArms(recorded)[0]?.email).toEqual({ contains: 'jo', mode: 'insensitive' });
   });
 
   it('search never emits mode for mysql (would throw on MySQL)', async () => {
@@ -32,8 +40,7 @@ describe('QueryBuilder conditions', () => {
     await new QueryBuilder(delegate, { dialect: 'mysql' })
       .search({ searchText: 'jo', fields: ['email'] })
       .execute();
-    const where = recorded.findManyArgs?.where as Record<string, any>;
-    expect(where.OR[0].email).toEqual({ contains: 'jo' });
+    expect(orArms(recorded)[0]?.email).toEqual({ contains: 'jo' });
   });
 
   it('registerDialect changes search output without core changes (coverage gap 7)', async () => {
@@ -42,8 +49,7 @@ describe('QueryBuilder conditions', () => {
     await new QueryBuilder(delegate, { dialect: 'futuredb' as Dialect })
       .search({ searchText: 'jo', fields: ['email'] })
       .execute();
-    const where = recorded.findManyArgs?.where as Record<string, any>;
-    expect(where.OR[0].email).toEqual({ contains: 'jo', mode: 'insensitive' });
+    expect(orArms(recorded)[0]?.email).toEqual({ contains: 'jo', mode: 'insensitive' });
   });
 
   it('filter strips undefined values', async () => {
@@ -84,8 +90,8 @@ describe('QueryBuilder search robustness (audits F13, G7)', () => {
     await new QueryBuilder(delegate)
       .search({ searchText: 'jo', fields: ['email', 'id'] })
       .execute();
-    const where = recorded.findManyArgs?.where as Record<string, any>;
-    expect(where.OR[0].email).not.toBe(where.OR[1].id);
+    const arms = orArms(recorded);
+    expect(arms[0]?.email).not.toBe(arms[1]?.id);
   });
 
   it('whitespace-only searchText adds no condition (audit G7)', async () => {
@@ -147,17 +153,13 @@ describe('QueryBuilder custom undefined strip (audit F15)', () => {
 
   it('strips nested undefined values in custom args', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate)
-      .custom({ cursor: { id: 'u1', extra: undefined } })
-      .execute();
+    await new QueryBuilder(delegate).custom({ cursor: { id: 'u1', extra: undefined } }).execute();
     expect(recorded.findManyArgs?.cursor).toEqual({ id: 'u1' });
   });
 
   it('a custom where that is empty after stripping adds no condition', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate)
-      .custom({ where: { a: undefined } as Record<string, unknown> })
-      .execute();
+    await new QueryBuilder(delegate).custom({ where: { a: undefined } }).execute();
     expect(recorded.findManyArgs?.where).toBeUndefined();
   });
 });
@@ -251,9 +253,9 @@ describe('QueryBuilder strictNumbers (audits F12, F18)', () => {
     expect(() =>
       new QueryBuilder(delegate, { strictNumbers: true }).cursorPaginate({ limit: 2000 }),
     ).toThrow('strictNumbers');
-    expect(() =>
-      new QueryBuilder(delegate, { strictNumbers: true }).paginate({ page: 0 }),
-    ).toThrow('strictNumbers');
+    expect(() => new QueryBuilder(delegate, { strictNumbers: true }).paginate({ page: 0 })).toThrow(
+      'strictNumbers',
+    );
   });
 
   it('still clamps silently by default', async () => {
@@ -321,9 +323,23 @@ describe('QueryBuilder cursor pagination', () => {
     expect(recorded.findManyArgs?.skip).toBe(1);
   });
 
+  it('backward page returns the rows adjacent to the cursor, in sort order', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    const { data, meta } = await new QueryBuilder(delegate)
+      .sortBy({ sortBy: 'id', sortOrder: 'asc' })
+      .cursorPaginate({ cursor: 'u25', direction: 'backward', limit: 3 })
+      .executeWithCursor();
+    expect(data.map((r) => r.id)).toEqual(['u22', 'u23', 'u24']);
+    expect(meta.hasPrevPage).toBe(true);
+    expect(meta.prevCursor).toBe('u22');
+    expect(meta.nextCursor).toBe('u24');
+  });
+
   it('next cursor round-trips to the following page without overlap (audit F4)', async () => {
     const { delegate } = createFakeDelegate(fakeRows(30));
-    const page1 = await new QueryBuilder(delegate).cursorPaginate({ limit: 10 }).executeWithCursor();
+    const page1 = await new QueryBuilder(delegate)
+      .cursorPaginate({ limit: 10 })
+      .executeWithCursor();
     expect(page1.meta.nextCursor).toBe('u9');
     expect(page1.data[9]?.id).toBe('u9');
     const page2 = await new QueryBuilder(delegate)
@@ -414,10 +430,7 @@ describe('QueryBuilder extras', () => {
 
   it('select and include are mutually exclusive (select wins last)', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate)
-      .include({ posts: true })
-      .select({ id: true })
-      .execute();
+    await new QueryBuilder(delegate).include({ posts: true }).select({ id: true }).execute();
     expect(recorded.findManyArgs?.select).toEqual({ id: true });
     expect(recorded.findManyArgs?.include).toBeUndefined();
   });
@@ -442,5 +455,14 @@ describe('QueryBuilder extras', () => {
     const total = await new QueryBuilder(delegate).paginate({ page: 2, limit: 3 }).count();
     expect(total).toBe(7);
     expect(recorded.countArgs?.take).toBeUndefined();
+  });
+});
+
+describe('cursorPaginate empty cursors', () => {
+  it.each([null, ''])('treats %j as the first page', async (cursor) => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate).cursorPaginate({ cursor, limit: 5 }).executeWithCursor();
+    expect(recorded.findManyArgs?.cursor).toBeUndefined();
+    expect(recorded.findManyArgs?.skip).toBeUndefined();
   });
 });

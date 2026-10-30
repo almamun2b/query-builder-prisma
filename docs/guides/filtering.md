@@ -10,9 +10,9 @@ import { QueryBuilder } from 'query-builder-prisma';
 
 new QueryBuilder(prisma.user)
   .search({ searchText: q, fields: ['email', 'username'] }) // OR across fields
-  .filter({ role, status })                                 // equality / operators
-  .range({ createdAt: { from, to } })                       // gte / lte
-  .where({ role: { in: ['ADMIN', 'EDITOR'] } })             // full typed where
+  .filter({ role, status }) // equality / operators
+  .range({ createdAt: { from, to } }) // gte / lte
+  .where({ role: { in: ['ADMIN', 'EDITOR'] } }); // full typed where
 // → all four AND-ed into one `where`
 ```
 
@@ -122,7 +122,7 @@ A single condition is used as-is; multiple conditions are wrapped as
 
 ```ts
 const qb = new QueryBuilder(prisma.user, {
-  initialArgs: { where: { deletedAt: null } },     // safety seed
+  initialArgs: { where: { deletedAt: null } }, // safety seed
 })
   .filter({ role: 'ADMIN' })
   .custom({ where: { verified: true } });

@@ -155,7 +155,12 @@ Semantics you can build on (the tests pin these):
   `.executeWithCursor()` in cursor mode.
 - **Cursor serialization** — `cursorPaginate({ cursor })` accepts a string,
   number or `Date`; `Date` values (and `Date` cursor fields) serialize to
-  ISO-8601, so cursors are round-trippable and locale/TZ-independent.
+  ISO-8601, so cursors are round-trippable and locale/TZ-independent. Returned
+  `nextCursor`/`prevCursor` are always strings — convert back for numeric
+  fields (`Number(cursor)`); `null` and `''` mean "first page".
+- **Backward pages** — `direction: 'backward'` sends a negative `take`; Prisma
+  returns those rows in sort order (verified against a real SQLite client), the
+  extra over-fetch row is the one farthest from the cursor and is dropped.
 - **Cursor flags are optimistic by default** — `hasNextPage`/`hasPrevPage` come
   from a one-row over-fetch and can rarely claim a page exists that turns out
   empty. `cursorPaginate({ strict: true })` spends one extra 1-row probe query
@@ -198,8 +203,8 @@ regression-tested. Remaining limitations are documented below.
 
 Open and documented rather than hidden — none produces a silently wrong result:
 
-- **Plain `.execute()` after `.cursorPaginate()`** returns raw seek-order rows
-  including the one-row over-fetch — use `.executeWithCursor()` for trimmed,
+- **Plain `.execute()` after `.cursorPaginate()`** returns raw rows
+  including the one-row over-fetch (first for backward pages) — use `.executeWithCursor()` for trimmed,
   sort-ordered pages (kept as raw-passthrough semantics by design; the
   `buildArgs()` passthrough is always available).
 
@@ -233,7 +238,7 @@ One `registerDialect(name, capabilities)` call — no core changes. See
 ## Development
 
 ```bash
-npm run verify   # lint + typecheck + test + build (the bar for every change)
+npm run verify   # format:check + lint + typecheck + test + build (the bar for every change)
 npm test         # unit tests — fake delegates, zero Prisma required
 ```
 

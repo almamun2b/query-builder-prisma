@@ -1,0 +1,8 @@
+# Fast, staged-files-only checks (no lint-staged dependency). Check, don't
+# rewrite: auto-fixing would also touch unstaged hunks of partially staged files.
+git diff --cached --name-only --diff-filter=ACMR -z |
+  xargs -0 -r npx --no -- prettier --check --ignore-unknown ||
+  { echo 'pre-commit: formatting issues — run `npm run format` and re-stage.' >&2; exit 1; }
+git diff --cached --name-only --diff-filter=ACMR -z |
+  { grep -z -E '\.(ts|js)$' || true; } |
+  xargs -0 -r npx --no -- eslint

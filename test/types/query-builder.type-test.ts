@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-parameters -- canonical Equal<> identity trick */
 import { QueryBuilder } from '../../src/core/query-builder';
 import type { PrismaModelDelegate } from '../../src/types/delegate';
 import type { PaginationMeta, PaginationMetaNoTotal } from '../../src/types/public';

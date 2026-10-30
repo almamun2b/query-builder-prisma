@@ -33,16 +33,16 @@ do no I/O. Terminal methods run the query.
 constructor(delegate: D, options?: QueryBuilderOptions<D>)
 ```
 
-| Parameter  | Type                                            | Description                          |
-| ---------- | ----------------------------------------------- | ------------------------------------ |
-| `delegate` | `D`                                             | The model delegate, e.g. `prisma.user` |
+| Parameter  | Type                                                       | Description                               |
+| ---------- | ---------------------------------------------------------- | ----------------------------------------- |
+| `delegate` | `D`                                                        | The model delegate, e.g. `prisma.user`    |
 | `options`  | [`QueryBuilderOptions<D>`](./types.md#querybuilderoptions) | `initialArgs`, `dialect`, `strictNumbers` |
 
 ```ts
 new QueryBuilder(prisma.user, {
   initialArgs: { where: { deletedAt: null } }, // seed where, AND-ed in front
-  dialect: 'postgresql',                       // per-builder dialect override
-  strictNumbers: true,                         // throw on out-of-range numbers
+  dialect: 'postgresql', // per-builder dialect override
+  strictNumbers: true, // throw on out-of-range numbers
 });
 ```
 
@@ -58,10 +58,10 @@ search(params: { searchText?: string | undefined; fields: WhereKeyOf<D>[] }): th
 
 Case-insensitive `contains` across the given string fields, OR-ed together.
 
-| Parameter    | Type              | Description                        |
-| ------------ | ----------------- | ---------------------------------- |
+| Parameter    | Type                  | Description                                        |
+| ------------ | --------------------- | -------------------------------------------------- |
 | `searchText` | `string \| undefined` | Text to search; empty/whitespace adds no condition |
-| `fields`     | `WhereKeyOf<D>[]` | Scalar **string** fields to search |
+| `fields`     | `WhereKeyOf<D>[]`     | Scalar **string** fields to search                 |
 
 - Dialect-aware: emits `mode: 'insensitive'` only on postgresql /
   cockroachdb / mongodb; elsewhere relies on collation (see
@@ -95,9 +95,9 @@ range(ranges: Record<string, RangeInput>): this
 Adds `gte`/`lte` conditions. Keys may be dot paths into to-one relations /
 nested objects; a field is only added when at least one bound is present.
 
-| Key          | Value                              |
-| ------------ | ---------------------------------- |
-| any path     | `{ from?: RangeBound; to?: RangeBound }` |
+| Key      | Value                                    |
+| -------- | ---------------------------------------- |
+| any path | `{ from?: RangeBound; to?: RangeBound }` |
 
 ```ts
 .range({ createdAt: { from, to }, 'avatar.size': { from: minSize } })
@@ -166,7 +166,7 @@ Ignored whenever cursor mode is configured —
 
 ```ts
 cursorPaginate(params: {
-  cursor?: string | number | Date | undefined;
+  cursor?: string | number | Date | null | undefined;
   limit?: number;
   direction?: CursorDirection;                  // 'forward' | 'backward'
   cursorField?: OrderKeyOf<D> | (string & {});  // default 'id'
@@ -176,13 +176,13 @@ cursorPaginate(params: {
 
 Configures seek pagination for [`.executeWithCursor()`](#executewithcursor).
 
-| Parameter     | Description                                                                 |
-| ------------- | --------------------------------------------------------------------------- |
+| Parameter     | Description                                                                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `cursor`      | `cursorField` value from the previous page's edge row; omit for the first page. `Date`s serialize to ISO-8601 in returned cursors. |
-| `limit`       | Page size (clamped like `.paginate()`). Default 10.                          |
-| `direction`   | `'forward'` (next pages) or `'backward'` (previous pages). Output order always follows the configured sort. |
-| `cursorField` | Unique, sequential column to seek on. Default `'id'`. Pair with a matching sort. |
-| `strict`      | One extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact.       |
+| `limit`       | Page size (clamped like `.paginate()`). Default 10.                                                                                |
+| `direction`   | `'forward'` (next pages) or `'backward'` (previous pages). Output order always follows the configured sort.                        |
+| `cursorField` | Unique, sequential column to seek on. Default `'id'`. Pair with a matching sort.                                                   |
+| `strict`      | One extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact.                                                             |
 
 Details, walking examples and guards:
 [Cursor pagination](../guides/cursor-pagination.md).
@@ -325,9 +325,9 @@ async executeWithMeta<O extends { includeTotal?: boolean } = { includeTotal?: bo
 Offset-mode execution: rows plus pagination metadata. `count()` and
 `findMany()` run in parallel.
 
-| Option         | Effect                                                                    |
-| -------------- | ------------------------------------------------------------------------- |
-| _(none)_       | `meta: PaginationMeta` — `{ page, limit, total, totalPage }`               |
+| Option                | Effect                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| _(none)_              | `meta: PaginationMeta` — `{ page, limit, total, totalPage }`                              |
 | `includeTotal: false` | Skips the `COUNT` query; `meta: PaginationMetaNoTotal` — `total: null`, `totalPage: null` |
 
 Behavior:
@@ -383,7 +383,9 @@ import { NoResultError } from 'query-builder-prisma';
 try {
   user = await qb.firstOrThrow();
 } catch (e) {
-  if (e instanceof NoResultError) { /* 404 */ }
+  if (e instanceof NoResultError) {
+    /* 404 */
+  }
 }
 ```
 

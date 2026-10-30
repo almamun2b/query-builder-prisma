@@ -25,12 +25,12 @@ that stays inside the builder's assembly rules:
 
 ```ts
 new QueryBuilder(prisma.user)
-  .filter({ role: 'ADMIN' })                     // explicit method…
+  .filter({ role: 'ADMIN' }) // explicit method…
   .custom({
     distinct: ['email'],
-    where: { verified: true },                   // …still applies alongside this
+    where: { verified: true }, // …still applies alongside this
   })
-  .custom({ distinct: undefined })               // cannot erase the value above
+  .custom({ distinct: undefined }); // cannot erase the value above
 // → findMany({ where: { AND: [{ role: 'ADMIN' }, { verified: true }] },
 //             distinct: ['email'] })
 ```

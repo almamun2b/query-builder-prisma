@@ -5,7 +5,7 @@
 
 ## Checklist (per AGENTS.md — review-blocking)
 
-- [ ] `npm run verify` green (lint → typecheck → test → build)
+- [ ] `npm run verify` green (format:check → lint → typecheck → test → build)
 - [ ] No `@prisma` imports anywhere; no new `dependencies`/`peerDependencies`
 - [ ] No database names in `src/core/` or `src/types/`
 - [ ] New public API re-exported from `src/index.ts`; README "Behavior

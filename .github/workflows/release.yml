@@ -8,12 +8,16 @@ name: Release
 #   feat!:/BREAKING CHANGE: → major   (1.0.0)
 #   chore:/docs:/ci:/test:  → no release ("no relevant changes")
 #
+# The full CI gate (ci.yml: verify, package, smoke) runs FIRST and the release
+# job needs it: semantic-release pushes the v* tag *before* npm publish, so a
+# failure discovered inside publish would strand a tag with no package.
+#
 # On a release it stamps the version into package.json inside the runner,
-# publishes to npm with provenance (prepublishOnly runs the full verify
-# pipeline first), pushes the v* tag and creates the GitHub Release with
-# generated notes. Nothing is committed back to main: it is protected by a
-# "changes must go through a pull request" ruleset, so the latest v* tag (and
-# npm) is the version source of truth; package.json on main is not bumped.
+# publishes to npm with provenance, pushes the v* tag and creates the GitHub
+# Release with generated notes. Nothing is committed back to main: it is
+# protected by a "changes must go through a pull request" ruleset, so the
+# latest v* tag (and npm) is the version source of truth; package.json on main
+# is not bumped (it lags the latest v* tag by design).
 # workflow_dispatch exists to re-run a failed release; semantic-release is
 # deterministic per commit range, so a re-run never double-publishes.
 
@@ -23,29 +27,39 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # v* tag, GitHub Release
-  id-token: write # npm provenance attestation
+  contents: read
 
 concurrency:
   group: npm-release
   cancel-in-progress: false
 
 jobs:
-  release:
+  verify:
     if: github.repository == 'almamun2b/query-builder-prisma'
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # v* tag, GitHub Release
+      id-token: write # npm provenance attestation (and trusted publishing)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # full history + tags — required for commit analysis
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org/
+          cache: npm
       - run: npm ci
       - name: semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Drop NPM_TOKEN once npm trusted publishing is registered for this
+          # repo/workflow on npmjs.com (id-token: write above is already set).
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: npx semantic-release

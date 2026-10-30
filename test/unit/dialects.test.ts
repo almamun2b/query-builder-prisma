@@ -7,7 +7,9 @@ import {
   setDialectDetector,
 } from '../../src/dialects/registry';
 
-afterEach(() => resetDialectConfig());
+afterEach(() => {
+  resetDialectConfig();
+});
 
 describe('resolveDialect', () => {
   it('falls back to universal capabilities', () => {
