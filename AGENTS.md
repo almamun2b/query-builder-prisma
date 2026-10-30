@@ -17,6 +17,12 @@ product's entire moat — every rule below protects it.
   too. A change is not done until this is green.
 - Run a single test file: `npx vitest run test/unit/conditions.test.ts`.
 - Watch mode: `npm run test:watch`.
+- Releases are automatic: semantic-release (`.github/workflows/release.yml`,
+  config in `.releaserc.json`) publishes on every push to `main` whose
+  Conventional Commits warrant a version — `fix:` → patch, `feat:` → minor,
+  `feat!:`/`BREAKING CHANGE:` → major; `chore:`/`docs:`/`ci:`/`test:` never
+  release. Never run `npm publish` or `npm version` by hand; the
+  `chore(release): vX.Y.Z [skip ci]` commit on `main` is bot-authored.
 
 No Prisma install or database is ever required. All tests use hand-written fake
 delegates (`test/helpers/fake-delegate.ts`) — this is deliberate: the suite
@@ -79,7 +85,7 @@ dual ESM+CJS). Details and layer boundaries: [ARCHITECTURE.md](./ARCHITECTURE.md
 - **Skills** (`.claude/skills/`): `add-dialect` — project-authored recipe for
   adding a database without touching `src/core/`. No Prisma-specific skills or
   MCP servers are configured: this package imports nothing from Prisma, so
-  tooling for *using* Prisma has no place here (invariant 1 applies to agent
+  tooling for _using_ Prisma has no place here (invariant 1 applies to agent
   tooling too).
 - **Shared settings** (`.claude/settings.json`): permission allowlist for the
   verify/test/lint/typecheck/build commands, so agents don't re-prompt on the

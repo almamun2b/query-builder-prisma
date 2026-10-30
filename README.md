@@ -12,11 +12,11 @@
 ```ts
 const { meta, data } = await new QueryBuilder(prisma.user)
   .search({ searchText: q, fields: ['email', 'username'] }) // dialect-aware
-  .filter({ role, status })                                 // undefined values stripped
+  .filter({ role, status }) // undefined values stripped
   .range({ createdAt: { from, to }, 'avatar.size': { from: min } })
   .sortBy({ sortBy: 'createdAt', sortOrder: 'desc' })
-  .paginate({ page: 1, limit: 20 })                         // or .cursorPaginate({...})
-  .select({ id: true, email: true })                        // output type narrows structurally
+  .paginate({ page: 1, limit: 20 }) // or .cursorPaginate({...})
+  .select({ id: true, email: true }) // output type narrows structurally
   .executeWithMeta();
 // meta: { page: 1, limit: 20, total: 142, totalPage: 8 }
 ```
@@ -51,13 +51,13 @@ runtime dependencies.
 
 ## Documentation
 
-|                                                                      |                                                    |
-| -------------------------------------------------------------------- | -------------------------------------------------- |
-| [Getting started](./docs/getting-started.md)                          | install, first query, imports                      |
-| [Guides](./docs/index.md#guides)                                      | filtering, sorting, both pagination modes, projections, dialects, advanced patterns |
-| [API reference](./docs/api/query-builder.md)                          | every method, type and function                    |
-| [Use cases](./docs/examples/use-cases.md)                             | end-to-end scenarios                               |
-| [Framework recipes](./docs/framework-recipes.md)                      | Next.js, NestJS, Express, edge runtimes            |
+|                                                  |                                                                                     |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| [Getting started](./docs/getting-started.md)     | install, first query, imports                                                       |
+| [Guides](./docs/index.md#guides)                 | filtering, sorting, both pagination modes, projections, dialects, advanced patterns |
+| [API reference](./docs/api/query-builder.md)     | every method, type and function                                                     |
+| [Use cases](./docs/examples/use-cases.md)        | end-to-end scenarios                                                                |
+| [Framework recipes](./docs/framework-recipes.md) | Next.js, NestJS, Express, edge runtimes                                             |
 
 ## Features
 
@@ -84,7 +84,7 @@ runtime dependencies.
 const { meta, data } = await new QueryBuilder(prisma.user)
   .filter({ status: 'ACTIVE' })
   .paginate({ page: 2, limit: 20 })
-  .executeWithMeta();                    // meta: { page: 2, limit: 20, total, totalPage }
+  .executeWithMeta(); // meta: { page: 2, limit: 20, total, totalPage }
 
 // Skip the COUNT query on large tables:
 await qb.executeWithMeta({ includeTotal: false }); // total: null, totalPage: null
@@ -118,8 +118,8 @@ await prisma.user.findMany(qb.buildArgs());
 ```ts
 import { configQueryBuilder } from 'query-builder-prisma';
 
-configQueryBuilder({ dialect: 'postgresql' });         // global default
-new QueryBuilder(prisma.user, { dialect: 'mysql' });   // per-builder override (recommended)
+configQueryBuilder({ dialect: 'postgresql' }); // global default
+new QueryBuilder(prisma.user, { dialect: 'mysql' }); // per-builder override (recommended)
 ```
 
 `search()` emits `mode: 'insensitive'` only on PostgreSQL / CockroachDB /
@@ -206,7 +206,7 @@ Open and documented rather than hidden — none produces a silently wrong result
 ## FAQ
 
 **Does this need Prisma installed?**
-The package never imports Prisma, but of course you query *through* your
+The package never imports Prisma, but of course you query _through_ your
 Prisma delegates — you pass them in. Any object with the `findMany` + `count`
 call shape works, which is also how the test suite proves the decoupling.
 
@@ -242,6 +242,26 @@ npm test         # unit tests — fake delegates, zero Prisma required
 - `src/types` — structural delegate contracts + projection type engine
 - `test/types` — compile-time projection tests (run by `npm run typecheck`)
 - `builder-old/` — the original prototype this package was extracted from (reference only)
+
+### Releases
+
+Releases are fully automatic — there is no manual publish step. Conventional
+Commits on `main` drive the version ([semantic-release](https://semantic-release.org),
+see `.github/workflows/release.yml`):
+
+| Commits since the last `v*` tag      | Version | Example       |
+| ------------------------------------ | ------- | ------------- |
+| `fix:`                               | patch   | 0.2.0 → 0.2.1 |
+| `feat:`                              | minor   | 0.2.0 → 0.3.0 |
+| `feat!:` / `BREAKING CHANGE:` footer | major   | 0.2.0 → 1.0.0 |
+| `chore:` / `docs:` / `ci:` / `test:` | none    | no release    |
+
+A release bumps `package.json`, publishes to npm with provenance (the full
+verify pipeline runs first), pushes the `v*` tag, and creates the GitHub
+Release with generated notes. [`CHANGELOG.md`](./CHANGELOG.md) stays
+hand-maintained; the auto-generated notes live on
+[GitHub Releases](https://github.com/almamun2b/query-builder-prisma/releases).
+A failed release can be re-run from the Actions tab (`workflow_dispatch`).
 
 ### Links
 

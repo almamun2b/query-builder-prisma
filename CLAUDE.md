@@ -43,5 +43,7 @@ No Prisma-specific agent tooling (skills, MCP servers) is configured on purpose:
 this package never imports Prisma, and its one external reference point — the
 delegate call shape — is documented in ARCHITECTURE.md.
 
-Current state: v0.2.0 on `main`; the HIGH defects are closed; clear the README
+Current state: v0.2.0 on `main`; releases are automatic — semantic-release on
+push to `main`, so commit messages (`feat:`/`fix:`/`feat!:`) drive the version;
+never publish by hand. The HIGH defects are closed; clear the README
 `Known limitations` before reaching for new features.
