@@ -45,9 +45,7 @@ Both methods write the same internal `orderBy` slot — the last call wins — a
 either beats an `orderBy` coming in through `.custom()`:
 
 ```ts
-new QueryBuilder(prisma.user)
-  .custom({ orderBy: { id: 'asc' } })
-  .sortBy({ sortBy: 'createdAt' })   // wins → orderBy: { createdAt: 'desc' }
+new QueryBuilder(prisma.user).custom({ orderBy: { id: 'asc' } }).sortBy({ sortBy: 'createdAt' }); // wins → orderBy: { createdAt: 'desc' }
 ```
 
 Explicit builder methods always beat `.custom()` args, regardless of call

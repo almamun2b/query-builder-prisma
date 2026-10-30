@@ -82,7 +82,7 @@ describe('toCursorArgs', () => {
 });
 
 describe('buildCursorPage', () => {
-  const mk = (i: number) => ({ id: `u${i}` });
+  const mk = (i: number) => ({ id: `u${String(i)}` });
 
   it('forward: slices the page, detects next, null prev on first page', () => {
     const rows = Array.from({ length: 12 }, (_, i) => mk(i));
@@ -99,8 +99,9 @@ describe('buildCursorPage', () => {
     expect(meta.prevCursor).toBeNull();
   });
 
-  it('backward: reverses rows so output stays in sort order', () => {
-    const rows = [mk(20), mk(19), mk(18)];
+  it('backward: drops the far over-fetch row and keeps sort order', () => {
+    // Prisma returns a negative take in sort order: the extra row is FIRST.
+    const rows = [mk(18), mk(19), mk(20)];
     const { data, meta } = buildCursorPage(rows, {
       limit: 2,
       direction: 'backward',
@@ -110,6 +111,7 @@ describe('buildCursorPage', () => {
     expect(data.map((r) => r.id)).toEqual(['u19', 'u20']);
     expect(meta.hasPrevPage).toBe(true);
     expect(meta.prevCursor).toBe('u19');
+    expect(meta.nextCursor).toBe('u20');
   });
 
   it('no extra rows means no next page', () => {

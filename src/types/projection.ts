@@ -50,13 +50,11 @@ type ProjectField<Field, Spec> = Spec extends true
  * Lists map over their element; optionality (`| null | undefined`) is preserved
  * exactly.
  */
-type ProjectNested<Field, Sub> =
-  Field extends readonly (infer E)[]
-    ? ApplySelect<E, Sub>[]
-    :
-        | ApplySelect<NonNullable<Field>, Sub>
-        | (undefined extends Field ? undefined : never)
-        | (null extends Field ? null : never);
+type ProjectNested<Field, Sub> = Field extends readonly (infer E)[]
+  ? ApplySelect<E, Sub>[]
+  : | ApplySelect<NonNullable<Field>, Sub>
+    | (undefined extends Field ? undefined : never)
+    | (null extends Field ? null : never);
 
 /**
  * Project a relation field through an `include`. Unlike select, include keeps
@@ -64,13 +62,11 @@ type ProjectNested<Field, Sub> =
  * via `ApplyInclude` (audit F3). Lists map over their element; optionality is
  * preserved exactly.
  */
-type ProjectNestedInclude<Field, Sub> =
-  Field extends readonly (infer E)[]
-    ? ApplyInclude<E, Sub>[]
-    :
-        | ApplyInclude<NonNullable<Field>, Sub>
-        | (undefined extends Field ? undefined : never)
-        | (null extends Field ? null : never);
+type ProjectNestedInclude<Field, Sub> = Field extends readonly (infer E)[]
+  ? ApplyInclude<E, Sub>[]
+  : | ApplyInclude<NonNullable<Field>, Sub>
+    | (undefined extends Field ? undefined : never)
+    | (null extends Field ? null : never);
 
 /**
  * The row shape produced by a `findMany` call with the given accumulated args.

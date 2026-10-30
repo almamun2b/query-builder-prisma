@@ -12,15 +12,19 @@ product's entire moat — every rule below protects it.
 
 ## Commands
 
-- `npm run verify` — the full gate: lint → typecheck → test → build. CI
-  (`.github/workflows/ci.yml`) runs the same four steps; `prepublishOnly` runs it
-  too. A change is not done until this is green.
+- `npm run verify` — the full gate: format:check → lint → typecheck → test → build. CI
+  (`.github/workflows/ci.yml`) runs the same steps plus packaging checks
+  (`publint`, `attw`) and a tarball smoke test on Node 18/20/22/24;
+  `prepublishOnly` runs `verify` too. A change is not done until this is green.
 - Run a single test file: `npx vitest run test/unit/conditions.test.ts`.
 - Watch mode: `npm run test:watch`.
 - Commit messages are enforced Conventional Commits via commitlint — a husky
   `commit-msg` hook locally (installed by the `prepare` script) plus a
-  `commitlint` job in CI on PRs/pushes to `main`. Write `type(scope)?: subject`
-  so semantic-release can parse the version.
+  `commitlint` CI job that lints the **PR title** (`main` is PR-only, so with
+  squash merges the title is the commit semantic-release reads). Write
+  `type(scope)?: subject` so semantic-release can parse the version. Two more
+  husky hooks run locally: `pre-commit` (prettier + eslint on staged files) and
+  `pre-push` (typecheck + tests).
 - Releases are automatic: semantic-release (`.github/workflows/release.yml`,
   config in `.releaserc.json`) publishes on every push to `main` whose
   Conventional Commits warrant a version — `fix:` → patch, `feat:` → minor,
@@ -97,11 +101,16 @@ dual ESM+CJS). Details and layer boundaries: [ARCHITECTURE.md](./ARCHITECTURE.md
 
 ## Code style
 
-- tsconfig uses `strict` + `noUncheckedIndexedAccess` + `verbatimModuleSyntax` —
-  type-only imports must use `import type`, and array/record access needs
-  undefined handling.
-- Prettier: single quotes, printWidth 100, semicolons, trailing commas. ESLint:
-  `no-explicit-any` is off; unused vars/args must be prefixed `_`.
+- TypeScript 6 with `strict` plus `noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`, `noUnusedLocals/Parameters`, `noImplicitOverride`,
+  `erasableSyntaxOnly` and `verbatimModuleSyntax` — type-only imports must use
+  `import type`, and array/record access needs undefined handling.
+  `tsconfig.build.json` covers `src/` only with `types: []` (no Node globals can
+  leak into the edge-safe library); `tsconfig.json` adds tests and configs.
+- Prettier: single quotes, printWidth 100, semicolons, trailing commas
+  (`npm run format`; `format:check` is part of `verify`). ESLint 10 runs
+  `strictTypeChecked` + `stylisticTypeChecked`: `no-explicit-any` is an error,
+  unused vars/args must be prefixed `_`.
 - Tests read like the existing suites: recorded-args assertions against the fake
   delegate for "what was sent", direct calls for pure functions, strict
   `Expect<Equal>` for type shapes.

@@ -8,7 +8,7 @@ You are the release gatekeeper for `query-builder-prisma`. Execute
 every step, collect evidence, and end with a single GO / NO-GO verdict. You must
 never run a real `npm publish`.
 
-1. **Verify pipeline** — `npm run verify` (lint → typecheck → test → build).
+1. **Verify pipeline** — `npm run verify` (format:check → lint → typecheck → test → build).
    Any failure = NO-GO; attach the failing output.
 2. **Tarball contents** — `npm publish --dry-run`. The tarball must contain
    exactly `dist/` (6 build files), `README.md`, `LICENSE`, `package.json`. Any

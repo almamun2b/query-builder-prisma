@@ -1,7 +1,7 @@
 # Offset pagination
 
 Offset ("skip/take") pagination is the classic page-number model: the client
-asks for *page N with limit L*, the builder computes `skip`/`take`, and
+asks for _page N with limit L_, the builder computes `skip`/`take`, and
 `executeWithMeta()` returns the rows plus `page`/`limit`/`total`/`totalPage`
 metadata. Use it for admin tables, dashboards and anything that needs numbered
 pages and a total count. For very large or fast-moving tables, prefer
@@ -69,9 +69,7 @@ Counts rows matching the current filters. Pagination and projections are
 ignored — only the assembled `where` is sent:
 
 ```ts
-const total = await new QueryBuilder(prisma.user)
-  .filter({ status: 'ACTIVE' })
-  .count(); // ignores .paginate()/.select()
+const total = await new QueryBuilder(prisma.user).filter({ status: 'ACTIVE' }).count(); // ignores .paginate()/.select()
 ```
 
 ## Clamping and limits
@@ -79,11 +77,11 @@ const total = await new QueryBuilder(prisma.user)
 Out-of-range numbers cannot reach the database unbounded. By default the
 builder clamps silently:
 
-| Input                                   | Behavior                                  |
-| --------------------------------------- | ----------------------------------------- |
-| `limit` outside `[1, 1000]`              | clamped into `[1, 1000]` (non-finite → 10) |
-| page below 1 (or non-finite)             | becomes page 1                             |
-| computed `skip` beyond `100_000`         | capped at `100_000` — deep access should use cursor pagination |
+| Input                            | Behavior                                                       |
+| -------------------------------- | -------------------------------------------------------------- |
+| `limit` outside `[1, 1000]`      | clamped into `[1, 1000]` (non-finite → 10)                     |
+| page below 1 (or non-finite)     | becomes page 1                                                 |
+| computed `skip` beyond `100_000` | capped at `100_000` — deep access should use cursor pagination |
 
 With `strictNumbers: true` on the constructor, all of the above **throw
 instead** — including a computed skip beyond the cap, which fails before the
@@ -91,8 +89,8 @@ instead** — including a computed skip beyond the cap, which fails before the
 
 ```ts
 const qb = new QueryBuilder(prisma.user, { strictNumbers: true });
-qb.paginate({ page: 0 });       // throws: page must be >= 1
-qb.paginate({ limit: 5000 });   // throws: limit outside [1, 1000]
+qb.paginate({ page: 0 }); // throws: page must be >= 1
+qb.paginate({ limit: 5000 }); // throws: limit outside [1, 1000]
 qb.paginate({ page: 1_000_000, limit: 100 }); // throws: skip beyond cap
 ```
 

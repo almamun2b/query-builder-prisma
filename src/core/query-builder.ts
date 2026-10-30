@@ -117,7 +117,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   private cursor: string | number | Date | undefined;
   private cursorLimit: number | undefined;
   private cursorDirection: CursorDirection = 'forward';
-  private cursorField: string = 'id';
+  private cursorField = 'id';
   private cursorStrict = false;
 
   /**
@@ -128,7 +128,9 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     this.delegate = delegate;
     this.dialect = options?.dialect;
     this.strictNumbers = options?.strictNumbers ?? false;
-    if (options?.initialArgs) {
+    // The lint checker resolves `FindManyArgsOf<D>` of a bare generic `D` to `never`.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (options?.initialArgs !== undefined) {
       const { where, ...rest } = options.initialArgs as Record<string, unknown>;
       this.customArgs = { ...rest };
       this.customWhere = where;
@@ -202,7 +204,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
 
   /** Adds an arbitrary, fully-typed Prisma `where` condition. */
   where(condition: WhereOf<D>): this {
-    const cleaned = stripUndefined(condition as Record<string, unknown>);
+    const cleaned = stripUndefined(condition);
     if (Object.keys(cleaned).length > 0) {
       this.andConditions.push(cleaned);
     }
@@ -231,7 +233,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * convenience — the latest of the two calls wins (audit G1).
    */
   orderBy(order: OrderByOf<D>): this {
-    this.orderByArg = order as object;
+    this.orderByArg = order;
     return this;
   }
 
@@ -249,8 +251,10 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * to run the query and obtain `next`/`prev` cursors.
    *
    * - `cursor` is the value of `cursorField` from the edge row of the previous
-   *   page (omit it for the first page). Strings, numbers and Dates are
-   *   accepted; Dates serialize to ISO-8601 in the returned cursors (audit F4).
+   *   page (omit it — or pass `null`/`''` — for the first page). Strings,
+   *   numbers and Dates are accepted; Dates serialize to ISO-8601 in the
+   *   returned cursors (audit F4). Returned cursors are always strings: for a
+   *   numeric field convert back (`Number(cursor)`) before passing it in.
    * - `direction` walks `'forward'` (next) or `'backward'` (previous).
    * - `cursorField` is the unique, sequential column to seek on (default `id`).
    *   Pair it with a matching {@link sortBy} for stable ordering.
@@ -260,7 +264,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * Takes precedence over {@link paginate} when both are set.
    */
   cursorPaginate(params: {
-    cursor?: string | number | Date | undefined;
+    cursor?: string | number | Date | null | undefined;
     limit?: number;
     direction?: CursorDirection;
     cursorField?: OrderKeyOf<D> | (string & {});
@@ -268,7 +272,8 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   }): this {
     this.assertLimit(params.limit);
     this.cursorActive = true;
-    this.cursor = params.cursor;
+    // `null` / '' (an empty query-string value) mean "first page", not a cursor.
+    this.cursor = params.cursor === null || params.cursor === '' ? undefined : params.cursor;
     this.cursorLimit = params.limit;
     this.cursorDirection = params.direction ?? 'forward';
     this.cursorField = params.cursorField ?? 'id';
@@ -527,7 +532,9 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
       return;
     }
     if (!Number.isFinite(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
-      throw new Error(`strictNumbers: limit ${String(limit)} is outside [1, ${MAX_PAGE_SIZE}].`);
+      throw new Error(
+        `strictNumbers: limit ${String(limit)} is outside [1, ${String(MAX_PAGE_SIZE)}].`,
+      );
     }
   }
 

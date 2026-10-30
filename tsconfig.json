@@ -1,17 +1,9 @@
 {
+  "extends": "./tsconfig.build.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true,
-    "noEmit": true,
-    "types": ["node"]
+    // Type tests declare `type _1 = Expect<...>` aliases purely for the
+    // compiler; ESLint's no-unused-vars (with the `_` prefix) covers tests.
+    "noUnusedLocals": false
   },
-  "include": ["src", "test", "tsup.config.ts", "vitest.config.ts", "eslint.config.js"]
+  "include": ["src", "test", "tsup.config.ts", "vitest.config.ts"]
 }

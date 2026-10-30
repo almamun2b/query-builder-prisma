@@ -13,7 +13,7 @@ detector → `'universal'`. See [Dialects](../guides/dialects.md).
 ### `configQueryBuilder()`
 
 ```ts
-function configQueryBuilder(options: { dialect?: string | undefined }): void
+function configQueryBuilder(options: { dialect?: string | undefined }): void;
 ```
 
 Sets the global default dialect for all builders that do not override it.
@@ -27,7 +27,7 @@ configQueryBuilder({ dialect: 'postgresql' });
 ### `registerDialect()`
 
 ```ts
-function registerDialect(name: string, capabilities: DialectCapabilities): void
+function registerDialect(name: string, capabilities: DialectCapabilities): void;
 ```
 
 Registers (or replaces) capabilities for a database — including ones Prisma
@@ -44,7 +44,7 @@ registerDialect('my-future-db', {
 ### `resolveDialect()`
 
 ```ts
-function resolveDialect(explicit?: string | undefined): ResolvedDialect
+function resolveDialect(explicit?: string | undefined): ResolvedDialect;
 ```
 
 Resolves the active dialect per the documented precedence. An unregistered
@@ -60,7 +60,7 @@ resolveDialect('postgres');
 ### `setDialectDetector()`
 
 ```ts
-function setDialectDetector(detector: () => string | undefined): void
+function setDialectDetector(detector: () => string | undefined): void;
 ```
 
 Plugs in a best-effort auto-detector. By contract it must never throw; an
@@ -74,7 +74,7 @@ setDialectDetector(() => process.env.DB_PROVIDER);
 ### `resetDialectConfig()`
 
 ```ts
-function resetDialectConfig(): void
+function resetDialectConfig(): void;
 ```
 
 Test helper: clears the global dialect and the detector. Registered dialect
@@ -87,7 +87,7 @@ resetDialectConfig();
 ### `detectDialect()`
 
 ```ts
-function detectDialect(): Dialect | undefined
+function detectDialect(): Dialect | undefined;
 ```
 
 The built-in auto-detect hook. Returns `undefined` in v0 — callers fall

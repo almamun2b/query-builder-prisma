@@ -4,49 +4,128 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call: # reused by release.yml as its gate
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
-    strategy:
-      matrix:
-        # Current LTS lines. engines is still >=18, but 18/20 are EOL
-        # (Apr 2025 / Apr 2026) and no longer exercised here.
-        node: [22, 24]
+    name: verify (node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # The dev toolchain (vitest 5, eslint 10, commitlint 21) needs Node
+        # >= 22. The published package supports Node >= 18 — that claim is
+        # proven separately by the `smoke` job below, on the packed tarball.
+        node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
+          cache: npm
       - run: npm ci
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
 
-  # Conventional Commits enforcement (second layer; the local husky commit-msg
-  # hook is the first). Catches `--no-verify` bypasses. commitlint v21 needs
-  # Node >= 22, so this job pins 24.
-  # Push to main validates the exact range semantic-release will analyze
-  # (commits since the last v* tag); a PR validates just its own commits.
-  commitlint:
+  # Packaging checks: exports map / type resolution, then the tarball itself is
+  # installed and exercised on every supported Node line.
+  package:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # full history + tags — required for range analysis
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+          cache: npm
       - run: npm ci
-      - name: Lint commit messages
+      - run: npm run build
+      - run: npx --yes publint@0.3.25 run --strict
+      - run: npx --yes @arethetypeswrong/cli@0.18.5 --pack .
+      - name: Pack tarball
+        run: npm pack --pack-destination "$RUNNER_TEMP/pack"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tarball
+          path: ${{ runner.temp }}/pack/*.tgz
+          if-no-files-found: error
+
+  smoke:
+    name: smoke (node ${{ matrix.node }})
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tarball
+          path: ${{ runner.temp }}/pack
+      - name: Install the tarball and run it (CJS + ESM)
+        working-directory: ${{ runner.temp }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            npx commitlint --from "${{ github.event.pull_request.base.sha }}" --to "${{ github.sha }}" --verbose
-          else
-            FROM=$(git describe --tags --abbrev=0 --match='v*' 2>/dev/null || git rev-list --max-parents=0 HEAD)
-            npx commitlint --from "$FROM" --to HEAD --verbose
-          fi
+          mkdir smoke && cd smoke
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund ../pack/*.tgz
+          cat > check.cjs <<'JS'
+          const assert = require('node:assert/strict');
+          const { QueryBuilder } = require('query-builder-prisma');
+          const delegate = { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) };
+          const args = new QueryBuilder(delegate).filter({ a: 1 }).paginate({ page: 2, limit: 5 }).buildArgs();
+          assert.deepEqual(args, { where: { a: 1 }, take: 5, skip: 5 });
+          JS
+          cat > check.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import { QueryBuilder } from 'query-builder-prisma';
+          const delegate = { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) };
+          const args = new QueryBuilder(delegate).filter({ a: 1 }).paginate({ page: 2, limit: 5 }).buildArgs();
+          assert.deepEqual(args, { where: { a: 1 }, take: 5, skip: 5 });
+          JS
+          node check.cjs
+          node check.mjs
+
+  # Conventional Commits. `main` is PR-only: with squash merges the commit that
+  # semantic-release analyzes is the PR *title*, so that is what is linted here
+  # (before merge, where it can still block). The local husky commit-msg hook is
+  # the first layer; --no-verify only skips that one.
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Lint PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | npx commitlint --verbose
 
   # M3 (planned): version × database integration matrix.
   # Test apps pinned to prisma@5/6/7/8-rc × postgres/mysql/sqlite/mongodb,

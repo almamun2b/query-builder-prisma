@@ -1,0 +1,2 @@
+# Same gate CI runs, minus the slow steps (~3 s): types + tests.
+npm run typecheck && npm test

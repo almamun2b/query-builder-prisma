@@ -1,7 +1,9 @@
 # Contributing
 
-Short version: **`npm run verify` green = the bar.** It runs lint → typecheck →
-test → build, the same gate CI runs on Node 18/20/24. A change is not done until
+Short version: **`npm run verify` green = the bar.** It runs format:check →
+lint → typecheck → test → build, the same gate CI runs on Node 22/24 (the dev
+toolchain needs Node ≥ 22; the published package still supports Node ≥ 18 and CI
+smoke-tests the packed tarball on 18/20/22/24). A change is not done until
 it is green, with **zero Prisma installed and no database running** — that is
 the standing proof of the zero-coupling design, not an accident.
 
@@ -66,9 +68,13 @@ feat!: / BREAKING CHANGE:    for breaking changes
 | `docs:`, `chore:`, `ci:`, `test:`, …  | no release                         |
 
 Enforcement is two-layered: a husky `commit-msg` hook (installed automatically
-by the `prepare` script) rejects bad messages at commit time, and a CI job
-re-checks every PR and push to `main` — a `--no-verify` bypass is caught at CI,
-not by npm. Scope is free-form (`feat(dialects): …`); the type is what matters.
+by the `prepare` script) rejects bad messages at commit time, and a CI job lints
+the **PR title** — `main` is PR-only and squash-merged, so the title is the
+commit semantic-release reads. A `--no-verify` bypass is caught at CI, not by
+npm. Scope is free-form (`feat(dialects): …`); the type is what matters.
+
+Two more local hooks keep PRs green: `pre-commit` (prettier + eslint on staged
+files) and `pre-push` (typecheck + tests, ~3 s).
 
 ## Releases
 

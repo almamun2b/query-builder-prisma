@@ -12,10 +12,10 @@
     ],
     "allow": [
       "Bash(npm run verify)",
+      "Bash(npm run format:check)",
       "Bash(npm run lint)",
       "Bash(npm run typecheck)",
       "Bash(npm test)",
-      "Bash(npm run test:watch)",
       "Bash(npm run build)",
       "Bash(npx vitest run:*)"
     ]
@@ -23,6 +23,5 @@
   "attribution": {
     "commit": "",
     "pr": ""
-  },
-  "includeCoAuthoredBy": false
+  }
 }
