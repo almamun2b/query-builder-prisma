@@ -31,7 +31,7 @@ Read [AGENTS.md](./AGENTS.md) (rules + review checklist) and
 - `test/unit/` — runtime behavior against recorded fake delegates;
   `test/types/` — compile-time projection shapes. Fixtures in
   `test/helpers/fake-delegate.ts` are hand-written and Prisma-free on purpose.
-- `dist/` and `builder-old/` are never source — don't edit or import from them.
+- `dist/` is build output, never source — don't edit or import from it.
 
 Docs are single-sourced: design in ARCHITECTURE.md, working rules in AGENTS.md,
 behavior contracts and known limitations in the README. Behavior changes update
@@ -46,6 +46,29 @@ the README "Behavior contracts" section in the same change.
   dialect without touching `src/core/`.
 - No Prisma-specific skills or MCP servers: the package imports nothing from
   Prisma, so there is nothing for such tooling to do here.
+
+## Commit messages
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/) —
+they are what semantic-release parses on `main` to pick the next version, and
+the format is enforced by commitlint:
+
+```text
+type(scope)?: subject        e.g. fix: strip undefined where keys
+feat!: / BREAKING CHANGE:    for breaking changes
+```
+
+| Type                                  | Effect on release (push to `main`) |
+| ------------------------------------- | ---------------------------------- |
+| `fix:`, `perf:`, `revert:`            | patch                              |
+| `feat:`                               | minor                              |
+| `feat!:` or `BREAKING CHANGE:` footer | major                              |
+| `docs:`, `chore:`, `ci:`, `test:`, …  | no release                         |
+
+Enforcement is two-layered: a husky `commit-msg` hook (installed automatically
+by the `prepare` script) rejects bad messages at commit time, and a CI job
+re-checks every PR and push to `main` — a `--no-verify` bypass is caught at CI,
+not by npm. Scope is free-form (`feat(dialects): …`); the type is what matters.
 
 ## Releases
 

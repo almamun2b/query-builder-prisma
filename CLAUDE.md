@@ -13,8 +13,8 @@ live in the README (`Known limitations`).
 
 ## Repo-specific gotchas
 
-- Work only in `src/` and `test/`. `dist/` (build output) and `builder-old/`
-  (archived prototype) are never source — do not edit or import from them.
+- Work only in `src/` and `test/`. `dist/` (build output) is never source —
+  do not edit or import from it.
 - Type tests (`test/types/*.type-test.ts`) are compiled, not run: add them for
   any projection/type change and confirm with `npm run typecheck`. vitest will
   not pick them up.
@@ -43,5 +43,8 @@ No Prisma-specific agent tooling (skills, MCP servers) is configured on purpose:
 this package never imports Prisma, and its one external reference point — the
 delegate call shape — is documented in ARCHITECTURE.md.
 
-Current state: v0.2.0 on `main`; the HIGH defects are closed; clear the README
+Current state: v0.2.0 on `main`; releases are automatic — semantic-release on
+push to `main`, so commit messages (`feat:`/`fix:`/`feat!:`) drive the version;
+the format is enforced by commitlint (husky `commit-msg` hook + CI job);
+never publish by hand. The HIGH defects are closed; clear the README
 `Known limitations` before reaching for new features.
