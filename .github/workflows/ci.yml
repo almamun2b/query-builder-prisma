@@ -24,6 +24,30 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Conventional Commits enforcement (second layer; the local husky commit-msg
+  # hook is the first). Catches `--no-verify` bypasses. commitlint v21 needs
+  # Node >= 22, so this job pins 24 and stays out of the 18/20 verify matrix.
+  # Push to main validates the exact range semantic-release will analyze
+  # (commits since the last v* tag); a PR validates just its own commits.
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags — required for range analysis
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Lint commit messages
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            npx commitlint --from "${{ github.event.pull_request.base.sha }}" --to "${{ github.sha }}" --verbose
+          else
+            FROM=$(git describe --tags --abbrev=0 --match='v*' 2>/dev/null || git rev-list --max-parents=0 HEAD)
+            npx commitlint --from "$FROM" --to HEAD --verbose
+          fi
+
   # M3 (planned): version × database integration matrix.
   # Test apps pinned to prisma@5/6/7/8-rc × postgres/mysql/sqlite/mongodb,
   # plus a nightly canary job against prisma@dev to catch future breakage early.

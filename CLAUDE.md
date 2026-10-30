@@ -45,5 +45,6 @@ delegate call shape — is documented in ARCHITECTURE.md.
 
 Current state: v0.2.0 on `main`; releases are automatic — semantic-release on
 push to `main`, so commit messages (`feat:`/`fix:`/`feat!:`) drive the version;
+the format is enforced by commitlint (husky `commit-msg` hook + CI job);
 never publish by hand. The HIGH defects are closed; clear the README
 `Known limitations` before reaching for new features.

@@ -17,6 +17,10 @@ product's entire moat — every rule below protects it.
   too. A change is not done until this is green.
 - Run a single test file: `npx vitest run test/unit/conditions.test.ts`.
 - Watch mode: `npm run test:watch`.
+- Commit messages are enforced Conventional Commits via commitlint — a husky
+  `commit-msg` hook locally (installed by the `prepare` script) plus a
+  `commitlint` job in CI on PRs/pushes to `main`. Write `type(scope)?: subject`
+  so semantic-release can parse the version.
 - Releases are automatic: semantic-release (`.github/workflows/release.yml`,
   config in `.releaserc.json`) publishes on every push to `main` whose
   Conventional Commits warrant a version — `fix:` → patch, `feat:` → minor,
