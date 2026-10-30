@@ -8,10 +8,12 @@ name: Release
 #   feat!:/BREAKING CHANGE: → major   (1.0.0)
 #   chore:/docs:/ci:/test:  → no release ("no relevant changes")
 #
-# On a release it bumps package.json, publishes to npm with provenance
-# (prepublishOnly runs the full verify pipeline first), pushes the v* tag,
-# creates the GitHub Release with generated notes, and commits the version
-# bump back to main as "chore(release): v<version> [skip ci]".
+# On a release it stamps the version into package.json inside the runner,
+# publishes to npm with provenance (prepublishOnly runs the full verify
+# pipeline first), pushes the v* tag and creates the GitHub Release with
+# generated notes. Nothing is committed back to main: it is protected by a
+# "changes must go through a pull request" ruleset, so the latest v* tag (and
+# npm) is the version source of truth; package.json on main is not bumped.
 # workflow_dispatch exists to re-run a failed release; semantic-release is
 # deterministic per commit range, so a re-run never double-publishes.
 
@@ -21,7 +23,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # release commit, v* tag, GitHub Release
+  contents: write # v* tag, GitHub Release
   id-token: write # npm provenance attestation
 
 concurrency:
@@ -46,10 +48,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-          # Release commit attribution follows the repo owner (see AGENTS.md);
-          # never Claude or harness defaults.
-          GIT_AUTHOR_NAME: almamun2b
-          GIT_AUTHOR_EMAIL: almamun2b@gmail.com
-          GIT_COMMITTER_NAME: almamun2b
-          GIT_COMMITTER_EMAIL: almamun2b@gmail.com
         run: npx semantic-release

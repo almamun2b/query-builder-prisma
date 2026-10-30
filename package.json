@@ -57,7 +57,6 @@
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@eslint/js": "^9.17.0",
-    "@semantic-release/git": "^11.0.1",
     "@types/node": "^22.10.0",
     "conventional-commits-filter": "^6.0.1",
     "conventional-commits-parser": "^7.1.3",
