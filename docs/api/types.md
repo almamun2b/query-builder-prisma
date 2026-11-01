@@ -244,18 +244,29 @@ exact semantics can't be mirrored, the result is the _wider but correct_ type.
 ### `ApplySelect`
 
 Applies a `select` spec to a row: only selected fields remain, nested selects
-recurse into relation element types.
+recurse into relation element types. `_count` widens in as
+`Record<string, number>`, a key the row type does not describe is typed
+`unknown`, and a non-literal `boolean` flag makes its key optional.
 
 ### `ApplyInclude`
 
 Applies an `include` spec: the base row is kept and included relations are
 projected (recursively for nested includes; a truthy `_count` widens in as
-`Record<string, number>`).
+`Record<string, number>`, unknown relations are typed `unknown`).
 
 ### `ApplyProjection`
 
 Picks select vs include vs identity from the accumulated args type — the
-engine behind every execute method's return type.
+engine behind every execute method's return type. Explicit `select`/`include`
+beat a projection that arrived through `custom()`.
+
+### `ProjectionArgs` / `BuiltArgsOf`
+
+`ProjectionArgs<TArgs>` is the `select`/`include` part of the accumulated args.
+`BuiltArgsOf<D, TArgs>` is the return type of `buildArgs()`: the delegate's own
+`findMany` args with the tracked projection substituted for the wide optional
+`select`/`include`, which is what lets Prisma's `findMany` infer the exact
+native result for the passthrough.
 
 ### `FindResultOf`
 

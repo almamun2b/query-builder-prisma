@@ -133,17 +133,23 @@ Cursor mode wins over offset mode when both are configured.
 ## The type engine in one page
 
 - `RowElementOf<D>` extracts one row from `Awaited<ReturnType<D['findMany']>>`.
-- `ApplySelect<Row, S>` keeps the truthy keys of `S` ∩ `keyof Row`, recursing
-  through `ProjectField` into relation element types: arrays map over their
-  element, `| null | undefined` optionality is preserved exactly.
-- `ApplyInclude<Row, I>` intersects the base row with the projected relations.
+- `ApplySelect<Row, S>` keeps the truthy keys of `S`. A key on the row is
+  projected through `ProjectField` (arrays map over their element,
+  `| null | undefined` optionality is preserved exactly); `_count` becomes
+  `Record<string, number>`; any other key - a relation the row type does not
+  describe, because Prisma's generic `findMany` resolves to the scalar-only
+  row - degrades to `unknown` rather than being dropped. Keys whose flag is a
+  non-literal `boolean` are optional.
+- `ApplyInclude<Row, I>` intersects the base row with the same projected keys.
 - `ApplyProjection<Row, TArgs>` picks select vs include vs identity from the
   accumulated args type `TArgs`, which `.select()`/`.include()` thread through
-  the builder's return type.
-- Escape hatch: `buildArgs()` returns args typed with the accumulated `TArgs`,
-  so the passthrough `prisma.user.findMany(qb.buildArgs())` gets 100%
-  Prisma-native inference on every version.
-- Known precision gaps (`_count`) must degrade _wider_, never wrong,
+  the builder's return type. A projection passed to `.custom()` is tracked as
+  `customSelect`/`customInclude` and loses to an explicit one, like at runtime.
+- Escape hatch: `buildArgs()` returns `BuiltArgsOf<D, TArgs>` - the delegate's
+  args with the tracked `select`/`include` substituted for the wide optional
+  ones - so the passthrough `prisma.user.findMany(qb.buildArgs())` gets
+  Prisma-native inference (verified against a generated Prisma 7 client).
+- Known precision gaps (`_count`, unknown relations) must degrade _wider_, never wrong,
   and stay documented in the README (`Known limitations`).
 
 ## Dialect system

@@ -1,6 +1,7 @@
 import { QueryBuilder } from '../../src/core/query-builder';
 import type { PrismaModelDelegate } from '../../src/types/delegate';
 import type { PaginationMeta, PaginationMetaNoTotal } from '../../src/types/public';
+import type { Equal, Expect } from './helpers';
 
 interface User {
   id: string;
@@ -21,11 +22,6 @@ interface UserDelegate extends PrismaModelDelegate {
 
 declare const userDelegate: UserDelegate;
 
-// --- strict type-equality helpers (verified by `npm run typecheck`) ---
-type Equal<A, B> =
-  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
-type Expect<T extends true> = T;
-
 // --- executeWithMeta meta types ---
 
 // default call: meta keeps the exact PaginationMeta shape (no widening)
@@ -44,3 +40,23 @@ const _m3: Expect<Equal<Awaited<typeof _metaTotal>['meta'], PaginationMeta>> = t
 
 // array orderBy is accepted verbatim from the derived OrderByOf
 new QueryBuilder(userDelegate).orderBy([{ id: 'asc' }, { email: 'desc' }]);
+
+// --- includeTotal given as a non-literal boolean: both shapes are possible ---
+
+declare const maybeTotal: boolean;
+const _metaMaybe = new QueryBuilder(userDelegate).executeWithMeta({ includeTotal: maybeTotal });
+const _m4: Expect<
+  Equal<Awaited<typeof _metaMaybe>['meta'], PaginationMeta | PaginationMetaNoTotal>
+> = true;
+
+// an options object without includeTotal still yields the full meta
+const _metaEmpty = new QueryBuilder(userDelegate).executeWithMeta({});
+const _m5: Expect<Equal<Awaited<typeof _metaEmpty>['meta'], PaginationMeta>> = true;
+
+// --- negatives: wrong input must not compile ---
+
+// @ts-expect-error - includeTotal must be a boolean
+new QueryBuilder(userDelegate).executeWithMeta({ includeTotal: 'yes' });
+
+// @ts-expect-error - sortOrder only accepts 'asc' | 'desc'
+new QueryBuilder(userDelegate).sortBy({ sortBy: 'id', sortOrder: 'up' });

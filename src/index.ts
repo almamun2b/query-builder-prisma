@@ -37,7 +37,14 @@ export type {
   WhereKeyOf,
   WhereOf,
 } from './types/delegate';
-export type { ApplyInclude, ApplyProjection, ApplySelect, FindResultOf } from './types/projection';
+export type {
+  ApplyInclude,
+  ApplyProjection,
+  ApplySelect,
+  BuiltArgsOf,
+  FindResultOf,
+  ProjectionArgs,
+} from './types/projection';
 
 // Public option/meta types
 export type {

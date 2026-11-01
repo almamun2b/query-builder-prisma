@@ -18,7 +18,11 @@ const users = await new QueryBuilder(prisma.user).select({ id: true, email: true
 - Nested specs recurse into relation types; arrays map over their element;
   `| null | undefined` optionality is preserved exactly.
 - When the engine cannot mirror Prisma exactly, the type **degrades wider,
-  never wrong** (the one case today is `_count`, below).
+  never wrong** (`_count` and relations the row type does not describe, below).
+- A projection passed to `.custom()` narrows the type too, but an explicit
+  `.select()`/`.include()` always wins - at runtime and in the type.
+- A flag typed as a plain `boolean` (not the literal `true`) makes its key
+  optional in the result.
 
 ## select
 
@@ -74,24 +78,35 @@ Mixing `include` with an inner `select` projects the inner relation:
 // → (User & { posts: { id: string }[] })[]
 ```
 
-## The `_count` gap (documented limitation)
+## Where the type is deliberately wide
 
-`_count: true` widens the result type with `_count: Record<string, number>` —
-present and correct at runtime, but the statically-known relation keys are
-wider than Prisma's exact per-relation shape. This is the deliberate
-_wider-but-never-wrong_ degradation:
+**Relations the row type does not describe.** Prisma's generated `findMany` is
+generic; the structural engine reads the row type at the method's default
+instantiation, which is the scalar-only row. A relation you request through
+`select` or `include` is therefore typed `unknown` - present, but its shape is
+not known statically:
+
+```ts
+.include({ posts: true })
+// → (UserScalars & { posts: unknown })[]
+```
+
+**`_count`.** `_count: true` (in `select` or `include`) widens the result type
+with `_count: Record<string, number>` — present and correct at runtime, but the
+statically-known relation keys are wider than Prisma's exact per-relation
+shape. This is the deliberate _wider-but-never-wrong_ degradation:
 
 ```ts
 .include({ posts: true, _count: true })
 // → (User & { posts: Post[]; _count: Record<string, number> })[]
 ```
 
-Need the exact shape? Use the passthrough (next section).
+Need the exact shapes? Use the passthrough (next section).
 
 ## The passthrough: 100% Prisma-native inference
 
 `buildArgs()` returns the fully assembled `findMany` args, typed with the
-accumulated projection. Hand them to Prisma's own `findMany` and its overloads
+accumulated projection (`BuiltArgsOf`). Hand them to Prisma's own `findMany` and its overloads
 give you the exact native result type — same query, zero divergence:
 
 ```ts

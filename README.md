@@ -178,10 +178,17 @@ Semantics you can build on (the tests pin these):
 - **`range()` reaches to-one paths only** — dot paths expand for to-one
   relations and nested objects; filtering a to-many relation needs
   `.custom({ where: { posts: { some: { ... } } } })`.
-- **`_count` is typed wide** — `include({ _count: true })` widens the result
-  type with `_count: Record<string, number>` (present, correct keys are unknown
-  statically); the `prisma.user.findMany(qb.buildArgs())` passthrough recovers
-  the exact per-relation shape.
+- **Wide-but-never-wrong types** — `_count` (in `select` or `include`) widens the
+  result type with `_count: Record<string, number>`, and a relation that the
+  delegate's row type does not describe (Prisma's generic `findMany` resolves to
+  the scalar-only row) is typed `unknown` instead of being dropped. A flag typed
+  as a plain `boolean` makes its key optional. The
+  `prisma.user.findMany(qb.buildArgs())` passthrough recovers Prisma's exact
+  per-relation shape (verified against a generated Prisma 7 client).
+- **`custom()` projections are tracked** — a literal `select`/`include` passed to
+  `.custom()` narrows the result type, but an explicit `.select()`/`.include()`
+  always wins, as at runtime. `initialArgs` projections and a `custom()` argument
+  held in a wide variable are not tracked.
 - **`cursorField`** — must be unique and sequentially ordered (pair it with a
   matching `.sortBy()`); duplicates paginate wrong silently.
 - **One builder per query** — instances are cheap; never share one across
@@ -222,7 +229,8 @@ conditions between concurrent requests. See
 [framework recipes](./docs/framework-recipes.md).
 
 **What if a type isn't narrow enough?**
-The engine degrades wider, never wrong (today only `_count`). For exact
+The engine degrades wider, never wrong (`_count`, relations the row type
+does not describe). For exact
 Prisma-native inference on any query, use the passthrough:
 `prisma.user.findMany(qb.buildArgs())`.
 

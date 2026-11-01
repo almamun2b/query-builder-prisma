@@ -220,18 +220,22 @@ any active `.select()`.
 // execute() → Promise<(User & { posts: (Post & { comments: Comment[] })[] })[]>
 ```
 
-`_count` widens in as `Record<string, number>` (wider-but-never-wrong; see
-[Projections](../guides/projections.md#the-_count-gap-documented-limitation)).
+`_count` widens in as `Record<string, number>` and relations the row type does
+not describe are typed `unknown` (wider-but-never-wrong; see
+[Projections](../guides/projections.md#where-the-type-is-deliberately-wide)).
 
 ## `.custom()`
 
 ```ts
-custom(args: FindManyArgsOf<D>): this
+custom<C extends FindManyArgsOf<D>>(args: C): QueryBuilder<D, …>
 ```
 
 Merges raw `findMany` args (`distinct`, `cursor`, a `where`, …):
 
 - explicit methods beat custom args regardless of call order;
+- a literal `select`/`include` in `args` narrows the result type, unless an
+  explicit `.select()`/`.include()` exists (which wins, in the type as at
+  runtime); pass literals - an argument held in a wide variable is not tracked;
 - a custom `where` is AND-ed with the `initialArgs` seed and previous custom
   `where`s — never replaces them;
 - `undefined` is stripped at any depth; dangerous keys are refused.
@@ -247,12 +251,12 @@ Merges raw `findMany` args (`distinct`, `cursor`, a `where`, …):
 ## `buildArgs()`
 
 ```ts
-buildArgs(): FindManyArgsOf<D>
+buildArgs(): BuiltArgsOf<D, TArgs>
 ```
 
 The fully assembled `findMany` args, without executing. Useful for debugging
 and for the passthrough `prisma.user.findMany(qb.buildArgs())`, which gets
-100% Prisma-native inference.
+Prisma-native inference: the tracked `select`/`include` is part of the type.
 
 ```ts
 const args = qb.filter({ status: 'ACTIVE' }).paginate({ page: 1, limit: 20 }).buildArgs();

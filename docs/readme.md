@@ -23,7 +23,7 @@ Task-oriented, in the order you typically need them:
 | [Sorting](./guides/sorting.md)                          | `sortBy` vs `orderBy`, dot paths, precedence                              |
 | [Offset pagination](./guides/pagination.md)             | `paginate` + `executeWithMeta`, clamping, `strictNumbers`, `includeTotal` |
 | [Cursor pagination](./guides/cursor-pagination.md)      | `cursorPaginate` + `executeWithCursor`, directions, strict mode, cursors  |
-| [Projections (select/include)](./guides/projections.md) | Type narrowing without Prisma types, nested includes, the `_count` gap    |
+| [Projections (select/include)](./guides/projections.md) | Type narrowing without Prisma types, nested includes, wide-type cases     |
 | [Dialects](./guides/dialects.md)                        | Per-database capabilities, resolution order, custom dialects              |
 | [Advanced patterns](./guides/advanced.md)               | `custom()`, `initialArgs` seeding, safety hardening, concurrency rules    |
 

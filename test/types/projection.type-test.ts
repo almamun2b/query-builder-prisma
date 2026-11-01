@@ -1,6 +1,7 @@
 import { QueryBuilder } from '../../src/core/query-builder';
 import type { PrismaModelDelegate } from '../../src/types/delegate';
 import type { FindResultOf } from '../../src/types/projection';
+import type { Equal, Expect } from './helpers';
 
 interface Comment {
   id: string;
@@ -43,6 +44,7 @@ interface UserFindArgs {
     createdAt?: boolean;
     posts?: boolean | { select?: { id?: boolean; title?: boolean } };
     profile?: boolean | { select?: { id?: boolean; bio?: boolean } };
+    _count?: boolean | { select?: Record<string, boolean> };
   };
   include?: {
     posts?:
@@ -70,11 +72,6 @@ interface UserDelegate extends PrismaModelDelegate {
 }
 
 declare const userDelegate: UserDelegate;
-
-// --- strict type-equality helpers (verified by `npm run typecheck`) ---
-type Equal<A, B> =
-  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
-type Expect<T extends true> = T;
 
 // no projection => full row type
 const _unprojected = new QueryBuilder(userDelegate).execute();
@@ -163,3 +160,73 @@ const _12: Expect<
 // include without `_count` gains no `_count` key (no phantom fields)
 const _noCount = new QueryBuilder(userDelegate).include({ posts: true }).execute();
 const _13: Expect<Equal<Awaited<typeof _noCount>, (User & { posts: Post[] })[]>> = true;
+
+// --- `_count` in a select is kept (no longer dropped) ---
+
+const _selectCount = new QueryBuilder(userDelegate).select({ id: true, _count: true }).execute();
+const _14: Expect<
+  Equal<Awaited<typeof _selectCount>, { id: string; _count: Record<string, number> }[]>
+> = true;
+
+const _selectCountNested = new QueryBuilder(userDelegate)
+  .select({ id: true, _count: { select: { posts: true } } })
+  .execute();
+const _15: Expect<
+  Equal<Awaited<typeof _selectCountNested>, { id: string; _count: Record<string, number> }[]>
+> = true;
+
+// --- non-literal boolean flags make a key optional, never required ---
+
+declare const looseSelect: { id: true; email: boolean };
+const _looseSelect = new QueryBuilder(userDelegate).select(looseSelect).execute();
+const _16: Expect<Equal<Awaited<typeof _looseSelect>, { id: string; email?: string }[]>> = true;
+
+// --- a flag of `false` selects nothing ---
+
+const _falseFlag = new QueryBuilder(userDelegate).select({ id: true, email: false }).execute();
+const _17: Expect<Equal<Awaited<typeof _falseFlag>, { id: string }[]>> = true;
+
+// --- projections supplied through custom() are tracked (explicit methods still win) ---
+
+const _customSelect = new QueryBuilder(userDelegate).custom({ select: { id: true } }).execute();
+const _18: Expect<Equal<Awaited<typeof _customSelect>, { id: string }[]>> = true;
+
+const _customInclude = new QueryBuilder(userDelegate)
+  .custom({ include: { posts: true } })
+  .execute();
+const _19: Expect<Equal<Awaited<typeof _customInclude>, (User & { posts: Post[] })[]>> = true;
+
+// an explicit .select() before custom() keeps winning, in the type as at runtime
+const _explicitThenCustom = new QueryBuilder(userDelegate)
+  .select({ email: true })
+  .custom({ select: { id: true } })
+  .execute();
+const _20: Expect<Equal<Awaited<typeof _explicitThenCustom>, { email: string }[]>> = true;
+
+// an explicit .select() after custom() replaces it
+const _customThenExplicit = new QueryBuilder(userDelegate)
+  .custom({ select: { id: true } })
+  .select({ email: true })
+  .execute();
+const _21: Expect<Equal<Awaited<typeof _customThenExplicit>, { email: string }[]>> = true;
+
+// a later custom() replaces an earlier one
+const _customTwice = new QueryBuilder(userDelegate)
+  .custom({ select: { id: true } })
+  .custom({ select: { email: true } })
+  .execute();
+const _22: Expect<Equal<Awaited<typeof _customTwice>, { email: string }[]>> = true;
+
+// custom() without a projection leaves the row untouched
+const _customWhere = new QueryBuilder(userDelegate)
+  .custom({ where: { id: 'u1' }, take: 5 })
+  .execute();
+const _23: Expect<Equal<Awaited<typeof _customWhere>, User[]>> = true;
+
+// --- negatives: wrong input must not compile ---
+
+// @ts-expect-error - select values must be boolean or a nested spec, not a string
+new QueryBuilder(userDelegate).select({ id: 'yes' });
+
+// @ts-expect-error - include values must be boolean or a nested spec, not a number
+new QueryBuilder(userDelegate).include({ posts: 1 });

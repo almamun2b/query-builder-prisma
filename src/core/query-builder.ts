@@ -9,7 +9,7 @@ import type {
   WhereKeyOf,
   WhereOf,
 } from '../types/delegate';
-import type { ApplyProjection, FindResultOf } from '../types/projection';
+import type { ApplyProjection, BuiltArgsOf, FindResultOf } from '../types/projection';
 import type {
   CursorDirection,
   CursorMeta,
@@ -59,10 +59,36 @@ export interface QueryBuilderOptions<D extends PrismaModelDelegate> {
   strictNumbers?: boolean | undefined;
 }
 
-/** Meta type of {@link QueryBuilder.executeWithMeta} for the given options. */
-type MetaOf<O extends { includeTotal?: boolean }> = O['includeTotal'] extends false
-  ? PaginationMetaNoTotal
+/**
+ * Meta type of {@link QueryBuilder.executeWithMeta} for the given options. A flag that is only
+ * known to be a `boolean` at compile time can produce either shape, so the result is the union.
+ */
+type MetaOf<O extends { includeTotal?: boolean }> = 'includeTotal' extends keyof O
+  ? [O['includeTotal']] extends [false]
+    ? PaginationMetaNoTotal
+    : [O['includeTotal']] extends [true | undefined]
+      ? PaginationMeta
+      : PaginationMeta | PaginationMetaNoTotal
   : PaginationMeta;
+
+/** `TArgs` without any projection: explicit `select`/`include` and `custom()`-sourced ones. */
+type ExplicitProjection<TArgs> = Omit<
+  TArgs,
+  'select' | 'include' | 'customSelect' | 'customInclude'
+>;
+
+/**
+ * `TArgs` after `.custom(C)`: a literal `select`/`include` in `C` is tracked, but only when no
+ * explicit `.select()`/`.include()` exists - explicit methods win at runtime, so the type must
+ * not change after them. A later `.custom()` replaces an earlier one, as at runtime.
+ */
+type WithCustom<TArgs, C> = TArgs extends { select: unknown } | { include: unknown }
+  ? TArgs
+  : C extends { select: infer S }
+    ? Omit<TArgs, 'customSelect' | 'customInclude'> & { customSelect: S }
+    : C extends { include: infer I }
+      ? Omit<TArgs, 'customSelect' | 'customInclude'> & { customInclude: I }
+      : TArgs;
 
 /** Thrown by {@link QueryBuilder.firstOrThrow} when no row matched. */
 export class NoResultError extends Error {
@@ -282,13 +308,10 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    */
   select<TSelect extends SelectOf<D>>(
     select: TSelect,
-  ): QueryBuilder<D, Omit<TArgs, 'select' | 'include'> & { select: TSelect }> {
+  ): QueryBuilder<D, ExplicitProjection<TArgs> & { select: TSelect }> {
     this.selectArg = select;
     this.includeArg = undefined;
-    return this as unknown as QueryBuilder<
-      D,
-      Omit<TArgs, 'select' | 'include'> & { select: TSelect }
-    >;
+    return this as unknown as QueryBuilder<D, ExplicitProjection<TArgs> & { select: TSelect }>;
   }
 
   /**
@@ -297,13 +320,10 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    */
   include<TInclude extends IncludeOf<D>>(
     include: TInclude,
-  ): QueryBuilder<D, Omit<TArgs, 'select' | 'include'> & { include: TInclude }> {
+  ): QueryBuilder<D, ExplicitProjection<TArgs> & { include: TInclude }> {
     this.includeArg = include;
     this.selectArg = undefined;
-    return this as unknown as QueryBuilder<
-      D,
-      Omit<TArgs, 'select' | 'include'> & { include: TInclude }
-    >;
+    return this as unknown as QueryBuilder<D, ExplicitProjection<TArgs> & { include: TInclude }>;
   }
 
   /**
@@ -315,7 +335,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * custom `where`s may nest `{ AND: [...] }` groups; Prisma treats that
    * identically.
    */
-  custom(args: FindManyArgsOf<D>): this {
+  custom<C extends FindManyArgsOf<D>>(args: C): QueryBuilder<D, WithCustom<TArgs, C>> {
     const { where, ...rest } = args as Record<string, unknown>;
     this.customArgs = { ...this.customArgs, ...deepStripUndefined(rest) };
     if (where !== undefined) {
@@ -325,11 +345,11 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
         this.customWhere = combineAnd([cleaned as object], this.customWhere);
       }
     }
-    return this;
+    return this as unknown as QueryBuilder<D, WithCustom<TArgs, C>>;
   }
 
   /** The fully assembled `findMany` args. Useful for debugging or reuse. */
-  buildArgs(): FindManyArgsOf<D> {
+  buildArgs(): BuiltArgsOf<D, TArgs> {
     const args: Record<string, unknown> = { ...this.customArgs };
 
     const where = this.buildWhere();
@@ -368,7 +388,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
       args.skip = offset.skip;
     }
 
-    return args as FindManyArgsOf<D>;
+    return args as BuiltArgsOf<D, TArgs>;
   }
 
   /**
@@ -430,9 +450,13 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * seek query, and the cursor over-fetch row would leak into `data`.
    * Use {@link executeWithCursor} instead.
    */
-  async executeWithMeta<O extends { includeTotal?: boolean } = { includeTotal?: boolean }>(
-    opts?: O,
-  ): Promise<{ meta: MetaOf<O>; data: FindResultOf<D, TArgs> }> {
+  async executeWithMeta(): Promise<{ meta: PaginationMeta; data: FindResultOf<D, TArgs> }>;
+  async executeWithMeta<O extends { includeTotal?: boolean }>(
+    opts: O,
+  ): Promise<{ meta: MetaOf<O>; data: FindResultOf<D, TArgs> }>;
+  async executeWithMeta(opts?: {
+    includeTotal?: boolean;
+  }): Promise<{ meta: PaginationMeta | PaginationMetaNoTotal; data: FindResultOf<D, TArgs> }> {
     if (this.cursorActive) {
       throw new Error(
         'executeWithMeta() is offset-mode only: this builder has cursor pagination ' +
@@ -451,7 +475,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
       return {
         meta: { page: offset.page, limit: offset.limit, total: null, totalPage: null },
         data,
-      } as { meta: MetaOf<O>; data: FindResultOf<D, TArgs> };
+      };
     }
 
     const [total, data] = await Promise.all([this.count(), this.execute()]);
@@ -459,7 +483,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     return {
       meta: buildPaginationMeta(total, offset.page, offset.limit),
       data,
-    } as { meta: MetaOf<O>; data: FindResultOf<D, TArgs> };
+    };
   }
 
   /**
