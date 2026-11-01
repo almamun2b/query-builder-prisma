@@ -13,7 +13,9 @@ that stays inside the builder's assembly rules:
 - **Explicit methods always win.** `.select()` beats `custom({ select })`,
   `.paginate()`/`.cursorPaginate()` beat `custom({ take })`,
   `.sortBy()`/`.orderBy()` beat `custom({ orderBy })` — regardless of call
-  order.
+  order. A projection always resolves to a single key (explicit `.select()` >
+  explicit `.include()` > `custom`/`initialArgs` `select` > their `include`), so
+  `select` and `include` are never sent together.
 - **`where` is AND-ed, never replaced.** A custom `where` merges with the
   `initialArgs` seed and any previous custom `where`. Successive calls may
   nest `{ AND: [...] }` groups; Prisma treats that identically.

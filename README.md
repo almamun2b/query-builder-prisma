@@ -134,7 +134,11 @@ Semantics you can build on (the tests pin these):
 - **Precedence** — explicit methods always win over `custom()` args, regardless of
   call order: `.select(X)` beats `custom({ select: Y })`;
   `.paginate(...)`/`.cursorPaginate(...)` beat `custom({ take })`;
-  `.sortBy()`/`.orderBy()` beat `custom({ orderBy })`.
+  `.sortBy()`/`.orderBy()` beat `custom({ orderBy })`. Projections resolve to
+  exactly one key: explicit `.select()` > explicit `.include()` > a `select`
+  from `custom()`/`initialArgs` > an `include` from the same — so `.select()`
+  on a builder seeded with an `include` sends only the `select` (and vice
+  versa), never both.
 - **`where` assembly** — conditions from `.search/.filter/.range/.where` are
   AND-ed, a seeded `initialArgs.where` is AND-ed in front of them, and
   `.custom({ where })` is AND-ed with the seed and previous custom `where`s —

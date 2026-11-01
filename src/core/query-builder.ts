@@ -134,6 +134,13 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * seed instead of replacing it (the seed carries safety filters).
    */
   private customWhere: unknown;
+  /**
+   * `select`/`include` from the `initialArgs` seed and `.custom()`. Kept apart from the explicit
+   * `.select()`/`.include()` so {@link resolveProjection} can apply one fixed precedence and
+   * never emit both keys (Prisma rejects `select` together with `include`).
+   */
+  private customSelect: object | undefined;
+  private customInclude: object | undefined;
   private orderByArg: object | undefined;
   private selectArg: object | undefined;
   private includeArg: object | undefined;
@@ -155,9 +162,11 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     this.dialect = options?.dialect;
     this.strictNumbers = options?.strictNumbers ?? false;
     if (options?.initialArgs) {
-      const { where, ...rest } = options.initialArgs as Record<string, unknown>;
+      const { where, select, include, ...rest } = options.initialArgs as Record<string, unknown>;
       this.customArgs = { ...rest };
       this.customWhere = where;
+      this.customSelect = (select ?? undefined) as object | undefined;
+      this.customInclude = (include ?? undefined) as object | undefined;
     }
   }
 
@@ -336,8 +345,14 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * identically.
    */
   custom<C extends FindManyArgsOf<D>>(args: C): QueryBuilder<D, WithCustom<TArgs, C>> {
-    const { where, ...rest } = args as Record<string, unknown>;
+    const { where, select, include, ...rest } = args as Record<string, unknown>;
     this.customArgs = { ...this.customArgs, ...deepStripUndefined(rest) };
+    if (select !== undefined && select !== null) {
+      this.customSelect = deepStripUndefined(select as Record<string, unknown>);
+    }
+    if (include !== undefined && include !== null) {
+      this.customInclude = deepStripUndefined(include as Record<string, unknown>);
+    }
     if (where !== undefined) {
       const cleaned = isPlainObject(where) ? deepStripUndefined(where) : where;
       const hasKeys = !isPlainObject(cleaned) || Object.keys(cleaned).length > 0;
@@ -359,12 +374,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     if (this.orderByArg) {
       args.orderBy = this.orderByArg;
     }
-    if (this.selectArg) {
-      args.select = this.selectArg;
-    }
-    if (this.includeArg) {
-      args.include = this.includeArg;
-    }
+    Object.assign(args, this.resolveProjection());
 
     if (this.cursorActive) {
       const cursorArgs = toCursorArgs({
@@ -580,15 +590,34 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
 
   /** A projection without the cursor field would derive cursors from `undefined`. */
   private assertCursorFieldProjected(): void {
-    // `.custom({ select })` also feeds args.select when no `.select()` ran.
-    const select = (this.selectArg ?? this.customArgs.select) as
-      Record<string, unknown> | undefined;
+    const select = this.resolveProjection().select as Record<string, unknown> | undefined;
     if (select && !select[this.cursorField]) {
       throw new Error(
         `executeWithCursor(): the projection drops cursorField "${this.cursorField}", so page ` +
           'cursors would be built from undefined. Keep the field in .select() or remove the projection.',
       );
     }
+  }
+
+  /**
+   * The one projection that reaches Prisma. Precedence, independent of call order:
+   * explicit `.select()` > explicit `.include()` > a `select` from `custom()`/`initialArgs`,
+   * then an `include` from the same sources. Never both keys.
+   */
+  private resolveProjection(): { select?: object; include?: object } {
+    if (this.selectArg) {
+      return { select: this.selectArg };
+    }
+    if (this.includeArg) {
+      return { include: this.includeArg };
+    }
+    if (this.customSelect) {
+      return { select: this.customSelect };
+    }
+    if (this.customInclude) {
+      return { include: this.customInclude };
+    }
+    return {};
   }
 
   private buildWhere(): object | undefined {

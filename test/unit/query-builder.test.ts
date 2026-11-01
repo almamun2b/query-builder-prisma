@@ -469,6 +469,68 @@ describe('QueryBuilder extras', () => {
     expect(recorded.findManyArgs?.include).toBeUndefined();
   });
 
+  it('select() beats a seeded include: never both in one query', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate, { initialArgs: { include: { posts: true } } })
+      .select({ id: true })
+      .execute();
+    expect(recorded.findManyArgs?.select).toEqual({ id: true });
+    expect(recorded.findManyArgs?.include).toBeUndefined();
+  });
+
+  it('include() beats a seeded select: never both in one query', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate, { initialArgs: { select: { id: true } } })
+      .include({ posts: true })
+      .execute();
+    expect(recorded.findManyArgs?.include).toEqual({ posts: true });
+    expect(recorded.findManyArgs?.select).toBeUndefined();
+  });
+
+  it('explicit select() wins over custom() regardless of call order', async () => {
+    const a = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(a.delegate)
+      .select({ id: true })
+      .custom({ include: { posts: true }, select: { email: true } })
+      .execute();
+    const b = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(b.delegate)
+      .custom({ include: { posts: true }, select: { email: true } })
+      .select({ id: true })
+      .execute();
+    for (const { recorded } of [a, b]) {
+      expect(recorded.findManyArgs?.select).toEqual({ id: true });
+      expect(recorded.findManyArgs?.include).toBeUndefined();
+    }
+  });
+
+  it('a custom() include is sent when nothing explicit was set', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate).custom({ include: { posts: true } }).execute();
+    expect(recorded.findManyArgs?.include).toEqual({ posts: true });
+    expect(recorded.findManyArgs?.select).toBeUndefined();
+  });
+
+  it('a seeded select feeds the cursor field guard', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    await expect(
+      new QueryBuilder(delegate, { initialArgs: { select: { email: true } } })
+        .cursorPaginate({ limit: 2 })
+        .executeWithCursor(),
+    ).rejects.toThrow('cursorField');
+  });
+
+  it('an explicit include() lifts a seeded select that would trip the cursor guard', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    const result = await new QueryBuilder(delegate, {
+      initialArgs: { select: { email: true } },
+    })
+      .include({ posts: true })
+      .cursorPaginate({ limit: 2 })
+      .executeWithCursor();
+    expect(result.data).toHaveLength(2);
+  });
+
   it('paginate().first() returns the global first row', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(20));
     const row = await new QueryBuilder(delegate).paginate({ page: 3, limit: 5 }).first();
