@@ -646,6 +646,76 @@ describe('QueryBuilder cursor pagination', () => {
   });
 });
 
+describe('QueryBuilder clone semantics', () => {
+  it('two select() calls on one base build independent queries', async () => {
+    const a = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(a.delegate).filter({ status: 'ACTIVE' });
+    const withId = base.select({ id: true });
+    const withEmail = base.select({ email: true });
+
+    await withId.execute();
+    expect(a.recorded.findManyArgs?.select).toEqual({ id: true });
+    await withEmail.execute();
+    expect(a.recorded.findManyArgs?.select).toEqual({ email: true });
+    await base.execute();
+    expect(a.recorded.findManyArgs?.select).toBeUndefined();
+    expect(a.recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
+  });
+
+  it('select() and include() return a new builder; the base is left untouched', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(delegate);
+    const selected = base.select({ id: true });
+    const included = base.include({ posts: true });
+    expect(selected).not.toBe(base);
+    expect(included).not.toBe(base);
+    await base.execute();
+    expect(recorded.findManyArgs?.select).toBeUndefined();
+    expect(recorded.findManyArgs?.include).toBeUndefined();
+  });
+
+  it('a clone does not share later conditions with its origin', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(delegate).filter({ status: 'ACTIVE' });
+    const branch = base.select({ id: true }).filter({ email: 'a@x.dev' });
+    await branch.execute();
+    expect(recorded.findManyArgs?.where).toEqual({
+      AND: [{ status: 'ACTIVE' }, { email: 'a@x.dev' }],
+    });
+    await base.execute();
+    expect(recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
+  });
+
+  it('clone() copies filters, sorting, pagination, custom args and cursor settings', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    const base = new QueryBuilder(delegate, { initialArgs: { where: { status: 'ACTIVE' } } })
+      .filter({ email: 'a@x.dev' })
+      .sortBy({ sortBy: 'email', sortOrder: 'asc' })
+      .custom({ distinct: ['email'] })
+      .cursorPaginate({ cursor: 'u5', limit: 3, direction: 'backward', strict: true });
+    const copy = base.clone();
+    expect(copy).not.toBe(base);
+    expect(copy.buildArgs()).toEqual(base.buildArgs());
+    await copy.executeWithCursor();
+    expect(recorded.findManyCalls).toHaveLength(2); // strict flag carried over: main + probe
+  });
+
+  it('custom() with a projection returns a new builder, without one it returns the same', () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(delegate);
+    expect(base.custom({ select: { id: true } })).not.toBe(base);
+    expect(base.custom({ distinct: ['email'] })).toBe(base);
+    expect(base.buildArgs()).toEqual({ distinct: ['email'] });
+  });
+
+  it('chain methods that keep the result type still mutate and return this', () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(delegate);
+    expect(base.filter({ status: 'ACTIVE' })).toBe(base);
+    expect(base.paginate({ page: 1, limit: 5 })).toBe(base);
+  });
+});
+
 describe('QueryBuilder extras', () => {
   it('custom merges raw args', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));

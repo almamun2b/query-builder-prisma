@@ -24,8 +24,13 @@ const result = await new QueryBuilder(prisma.user, { dialect: 'postgresql' })
   share one across concurrent requests (see
   [Advanced patterns](../guides/advanced.md#one-builder-per-query)).
 
-Chain methods return `this` (or a re-typed builder for `select`/`include`) and
-do no I/O. Terminal methods run the query.
+Chain methods do no I/O; terminal methods run the query. Methods that keep the
+result type (`filter`, `where`, `range`, `search`, `sortBy`, `orderBy`,
+`paginate`, `cursorPaginate`, `custom` without a projection) mutate and return
+`this`. Methods that change the result type - `select`, `include` and a
+`custom` call carrying a `select`/`include` - return a **new, independent
+builder** and leave the original untouched, so always use the returned value.
+`clone()` makes the same copy explicitly.
 
 ## constructor
 
@@ -195,11 +200,12 @@ Details, walking examples and guards:
 ```ts
 select<TSelect extends SelectOf<D>>(
   select: TSelect,
-): QueryBuilder<D, Omit<TArgs, 'select' | 'include'> & { select: TSelect }>
+): QueryBuilder<D, ExplicitProjection<TArgs> & { select: TSelect }>
 ```
 
 Projects fields with Prisma `select`; the result type of every execute method
-narrows to exactly the selected shape. Clears any active `.include()`.
+narrows to exactly the selected shape. Clears any active `.include()`. Returns a
+**new builder** - the original is not modified.
 
 ```ts
 .select({ id: true, email: true })
@@ -211,8 +217,10 @@ narrows to exactly the selected shape. Clears any active `.include()`.
 ```ts
 include<TInclude extends IncludeOf<D>>(
   include: TInclude,
-): QueryBuilder<D, Omit<TArgs, 'select' | 'include'> & { include: TInclude }>
+): QueryBuilder<D, ExplicitProjection<TArgs> & { include: TInclude }>
 ```
+
+Returns a **new builder** (like `select()`); the original is not modified.
 
 Eager-loads relations with Prisma `include`; the result type widens with the
 included relations, nested includes keeping each level's own fields. Clears
@@ -226,6 +234,21 @@ any active `.select()`.
 `_count` widens in as `Record<string, number>` and relations the row type does
 not describe are typed `unknown` (wider-but-never-wrong; see
 [Projections](../guides/projections.md#where-the-type-is-deliberately-wide)).
+
+## `.clone()`
+
+```ts
+clone(): QueryBuilder<D, TArgs>
+```
+
+An independent copy with the same filters, sorting, pagination, custom args,
+projection and cursor settings. Use it to branch one base query:
+
+```ts
+const base = new QueryBuilder(prisma.user).filter({ status: 'ACTIVE' });
+const admins = base.clone().filter({ role: 'ADMIN' });
+const names = base.select({ name: true }); // select() clones for you
+```
 
 ## `.custom()`
 
