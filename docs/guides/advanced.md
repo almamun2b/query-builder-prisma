@@ -21,8 +21,9 @@ that stays inside the builder's assembly rules:
   nest `{ AND: [...] }` groups; Prisma treats that identically.
 - **`undefined` is stripped at any depth.** A later
   `custom({ distinct: undefined })` cannot overwrite an earlier value.
-- **Dangerous keys are refused.** Keys named `__proto__`, `constructor` or
-  `prototype` are never written — relevant when args are assembled from
+- **Dangerous keys throw.** Keys named `__proto__`, `constructor` or
+  `prototype` raise `Refused key "…"` — never written, and never silently
+  dropped (that would widen the query). Relevant when args are assembled from
   parsed JSON.
 
 ```ts
@@ -129,9 +130,10 @@ Two uses:
 For builders fed from untrusted input (parsed JSON bodies, query strings):
 
 - `undefined` values are stripped, so missing fields are inert.
-- Keys `__proto__`, `constructor`, `prototype` are refused in `.custom()`,
-  `.filter()` and dot-path expansion — prototype pollution via computed keys
-  is not possible through builder-built objects.
+- Keys `__proto__`, `constructor`, `prototype` throw in `.custom()`,
+  `.filter()`, `.where()` and dot-path expansion — prototype pollution via
+  computed keys is not possible through builder-built objects, and a refused
+  filter fails the request instead of widening the query.
 - Pagination numbers are clamped (or throw under `strictNumbers`), so
   unbounded `skip`/`take` cannot reach the database.
 - The builder only ever calls `findMany` and `count` on the delegate you hand

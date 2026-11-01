@@ -58,13 +58,22 @@ describe('QueryBuilder conditions', () => {
     expect(recorded.findManyArgs?.where).toEqual({ avatar: { size: { gte: 5 } } });
   });
 
-  it('range adds nothing for a dangerous path', async () => {
-    const { delegate, recorded } = createFakeDelegate(fakeRows(2));
-    await new QueryBuilder(delegate)
-      .range({ 'a.__proto__.size': { from: 5 } })
-      .filter({ status: 'ACTIVE' })
-      .execute();
-    expect(recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
+  it('range throws for a dangerous path instead of widening the query', () => {
+    const { delegate } = createFakeDelegate(fakeRows(2));
+    expect(() => new QueryBuilder(delegate).range({ 'a.__proto__.size': { from: 5 } })).toThrow(
+      'Refused key "__proto__"',
+    );
+  });
+
+  it('filter, where and custom throw on a hostile request body', () => {
+    const { delegate } = createFakeDelegate(fakeRows(2));
+    const hostile = JSON.parse('{"status":"ACTIVE","__proto__":{"x":1}}') as Record<
+      string,
+      unknown
+    >;
+    expect(() => new QueryBuilder(delegate).filter(hostile)).toThrow('Refused key');
+    expect(() => new QueryBuilder(delegate).where(hostile)).toThrow('Refused key');
+    expect(() => new QueryBuilder(delegate).custom({ where: hostile })).toThrow('Refused key');
   });
 
   it('seeded initialArgs where is ANDed first', async () => {
@@ -173,9 +182,16 @@ describe('QueryBuilder sorting', () => {
     expect(recorded.findManyArgs?.orderBy).toEqual({ createdAt: 'desc' });
   });
 
-  it('sortBy adds nothing for a dangerous path', async () => {
+  it('sortBy throws for a dangerous path', () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    expect(() => new QueryBuilder(delegate).sortBy({ sortBy: 'a.__proto__.b' })).toThrow(
+      'Refused key "__proto__"',
+    );
+  });
+
+  it('an empty sortBy stays a no-op', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate).sortBy({ sortBy: 'a.__proto__.b' }).execute();
+    await new QueryBuilder(delegate).sortBy({ sortBy: '' }).execute();
     expect(recorded.findManyArgs?.orderBy).toBeUndefined();
   });
 
