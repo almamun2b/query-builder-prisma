@@ -161,8 +161,13 @@ Semantics you can build on (the tests pin these):
   was configured (offset meta cannot describe a seek query); use
   `.executeWithCursor()` in cursor mode.
 - **Cursor serialization** — `cursorPaginate({ cursor })` accepts a string,
-  number or `Date`; `Date` values (and `Date` cursor fields) serialize to
-  ISO-8601, so cursors are round-trippable and locale/TZ-independent.
+  number, bigint or `Date`; `Date` values (and `Date` cursor fields) serialize
+  to ISO-8601, so cursors are round-trippable and locale/TZ-independent.
+  `meta.nextCursor`/`prevCursor` are always **strings**, and Prisma rejects a
+  string for an `Int`/`BigInt` cursor field - so pass
+  `cursorType: 'number' | 'bigint' | 'date'` to convert a cursor read back from a
+  query string. The default `'string'` passes the value through unchanged; an
+  unconvertible cursor throws in `cursorPaginate()`, before any query is sent.
 - **Cursor flags are optimistic by default** — `hasNextPage`/`hasPrevPage` come
   from a one-row over-fetch and can rarely claim a page exists that turns out
   empty. `cursorPaginate({ strict: true })` spends one extra 1-row probe query

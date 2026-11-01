@@ -6,6 +6,20 @@ export type SortOrder = 'asc' | 'desc';
 /** Direction to walk through a cursor-paginated result set. */
 export type CursorDirection = 'forward' | 'backward';
 
+/**
+ * How an incoming `cursor` is converted before it reaches Prisma. Meta cursors are always
+ * strings, and Prisma rejects a string for an `Int`/`BigInt`/`DateTime` cursor field, so the
+ * value read back from a query string must be converted:
+ * - `'string'` (default): passed through unchanged (no conversion),
+ * - `'number'`: `Number(cursor)` for `Int`/`Float` fields,
+ * - `'bigint'`: `BigInt(cursor)` for `BigInt` fields,
+ * - `'date'`: `new Date(cursor)` for `DateTime` fields.
+ */
+export type CursorType = 'string' | 'number' | 'bigint' | 'date';
+
+/** A cursor value accepted by `cursorPaginate()`. */
+export type CursorValue = string | number | bigint | Date;
+
 /** A single numeric/date/string bound used by `QueryBuilder.range()`. */
 export type RangeBound = string | number | Date;
 

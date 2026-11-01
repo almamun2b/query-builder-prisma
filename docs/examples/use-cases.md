@@ -111,7 +111,8 @@ cursors, page info, edges.
 export async function usersConnection(first: number, after?: string) {
   const { meta, data } = await new QueryBuilder(prisma.user)
     .sortBy({ sortBy: 'id' })
-    .cursorPaginate({ cursor: after, cursorField: 'id', limit: first })
+    // `id` is an Int column, `after` arrives as a string: convert it for Prisma
+    .cursorPaginate({ cursor: after, cursorType: 'number', cursorField: 'id', limit: first })
     .executeWithCursor();
 
   return {

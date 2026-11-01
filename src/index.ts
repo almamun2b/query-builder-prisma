@@ -49,6 +49,8 @@ export type {
 // Public option/meta types
 export type {
   CursorDirection,
+  CursorType,
+  CursorValue,
   CursorMeta,
   FilterInput,
   PaginationMeta,

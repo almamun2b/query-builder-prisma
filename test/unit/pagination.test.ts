@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCursorPage,
+  coerceCursor,
   buildPaginationMeta,
   clampLimit,
   serializeCursorValue,
@@ -212,5 +213,59 @@ describe('buildCursorPage cursor value validation', () => {
   it('does not require the field when no cursor is derived', () => {
     const { meta } = buildCursorPage([{ other: 1 }], info);
     expect(meta.nextCursor).toBeNull();
+  });
+});
+
+describe('coerceCursor', () => {
+  it("'string' (the default) passes any value through untouched", () => {
+    expect(coerceCursor(5, 'string')).toBe(5);
+    expect(coerceCursor('u9', 'string')).toBe('u9');
+    const date = new Date('2026-01-01');
+    expect(coerceCursor(date, 'string')).toBe(date);
+    expect(coerceCursor(undefined, 'number')).toBeUndefined();
+  });
+
+  it("'number' parses a cursor string from a query string", () => {
+    expect(coerceCursor('42', 'number')).toBe(42);
+    expect(coerceCursor(' 7 ', 'number')).toBe(7);
+    expect(coerceCursor(3.5, 'number')).toBe(3.5);
+  });
+
+  it("'number' rejects non-numeric input with a message naming the value", () => {
+    expect(() => coerceCursor('abc', 'number')).toThrow('"abc"');
+    expect(() => coerceCursor('', 'number')).toThrow('number');
+    expect(() => coerceCursor(Number.NaN, 'number')).toThrow('number');
+    expect(() => coerceCursor('Infinity', 'number')).toThrow('number');
+  });
+
+  it("'bigint' parses decimal strings and integers", () => {
+    expect(coerceCursor('9007199254740993', 'bigint')).toBe(9007199254740993n);
+    expect(coerceCursor(12n, 'bigint')).toBe(12n);
+    expect(coerceCursor(8, 'bigint')).toBe(8n);
+  });
+
+  it("'bigint' rejects anything that is not an integer", () => {
+    expect(() => coerceCursor('x1', 'bigint')).toThrow('bigint');
+    expect(() => coerceCursor('1.5', 'bigint')).toThrow('bigint');
+    expect(() => coerceCursor(1.5, 'bigint')).toThrow('bigint');
+  });
+
+  it("'date' parses ISO strings and timestamps, keeps valid Dates", () => {
+    const iso = '2026-01-01T06:00:09.000Z';
+    expect(coerceCursor(iso, 'date')).toEqual(new Date(iso));
+    expect(coerceCursor(Date.parse(iso), 'date')).toEqual(new Date(iso));
+    const date = new Date(iso);
+    expect(coerceCursor(date, 'date')).toBe(date);
+  });
+
+  it("'date' rejects unparsable input", () => {
+    expect(() => coerceCursor('nope', 'date')).toThrow('"nope"');
+    expect(() => coerceCursor(new Date('nope'), 'date')).toThrow('date');
+  });
+});
+
+describe('serializeCursorValue for bigint', () => {
+  it('serializes bigint to its decimal string', () => {
+    expect(serializeCursorValue(9007199254740993n)).toBe('9007199254740993');
   });
 });

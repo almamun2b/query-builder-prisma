@@ -2,7 +2,13 @@
  * Offset ("skip/take") and cursor ("seek") pagination math — pure functions,
  * fully unit-testable without any database.
  */
-import type { CursorDirection, CursorMeta, PaginationMeta } from '../types/public';
+import type {
+  CursorDirection,
+  CursorMeta,
+  CursorType,
+  CursorValue,
+  PaginationMeta,
+} from '../types/public';
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_PAGE_SIZE = 1000;
@@ -65,6 +71,48 @@ export function serializeCursorValue(value: unknown): string {
 }
 
 /**
+ * Convert an incoming cursor to the type of the cursor field (see {@link CursorType}).
+ * `'string'` leaves the value untouched; an unconvertible value throws a message naming it,
+ * before any query is sent.
+ */
+export function coerceCursor(
+  value: CursorValue | undefined,
+  type: CursorType,
+): CursorValue | undefined {
+  if (value === undefined || type === 'string') {
+    return value;
+  }
+  const bad = (): never => {
+    throw new Error(
+      `cursorPaginate(): cursor ${describeCursor(value)} is not a valid ${type} (cursorType: '${type}').`,
+    );
+  };
+  if (type === 'number') {
+    const n =
+      typeof value === 'string' ? (value.trim() === '' ? Number.NaN : Number(value)) : value;
+    return typeof n === 'number' && Number.isFinite(n) ? n : bad();
+  }
+  if (type === 'bigint') {
+    if (typeof value === 'bigint') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? BigInt(value) : bad();
+    }
+    if (typeof value === 'string' && /^\s*-?\d+\s*$/.test(value)) {
+      return BigInt(value.trim());
+    }
+    return bad();
+  }
+  const date = value instanceof Date ? value : new Date(value as string | number);
+  return Number.isNaN(date.getTime()) ? bad() : date;
+}
+
+function describeCursor(value: unknown): string {
+  return typeof value === 'string' ? `"${value}"` : String(value);
+}
+
+/**
  * The page cursor of one edge row. A missing/`null` field or an Invalid Date cannot make a usable
  * cursor (it would otherwise become the literal string `"undefined"`/`"null"` or a bare
  * `RangeError`), so they fail with a message that names the field.
@@ -89,7 +137,7 @@ export function cursorValueOf(row: Record<string, unknown>, field: string): stri
 
 /** Everything needed to turn cursor options into `findMany` args. */
 export interface CursorPlan {
-  cursor?: string | number | Date | undefined;
+  cursor?: CursorValue | undefined;
   limit?: number | undefined;
   direction?: CursorDirection;
   cursorField: string;

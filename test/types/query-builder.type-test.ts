@@ -60,3 +60,10 @@ new QueryBuilder(userDelegate).executeWithMeta({ includeTotal: 'yes' });
 
 // @ts-expect-error - sortOrder only accepts 'asc' | 'desc'
 new QueryBuilder(userDelegate).sortBy({ sortBy: 'id', sortOrder: 'up' });
+
+// cursorType accepts only the four documented kinds, and bigint cursors compile
+new QueryBuilder(userDelegate).cursorPaginate({ cursor: '42', cursorType: 'number' });
+new QueryBuilder(userDelegate).cursorPaginate({ cursor: 42n, cursorType: 'bigint' });
+
+// @ts-expect-error - unknown cursorType
+new QueryBuilder(userDelegate).cursorPaginate({ cursor: '1', cursorType: 'uuid' });

@@ -13,6 +13,8 @@ import type { ApplyProjection, BuiltArgsOf, FindResultOf } from '../types/projec
 import type {
   CursorDirection,
   CursorMeta,
+  CursorType,
+  CursorValue,
   FilterInput,
   PaginationMeta,
   PaginationMetaNoTotal,
@@ -31,6 +33,7 @@ import {
   buildCursorPage,
   buildPaginationMeta,
   clampLimit,
+  coerceCursor,
   clampPage,
   toCursorArgs,
   toOffsetArgs,
@@ -101,7 +104,7 @@ interface OffsetPaging {
 
 interface CursorPaging {
   kind: 'cursor';
-  cursor: string | number | Date | undefined;
+  cursor: CursorValue | undefined;
   limit: number | undefined;
   direction: CursorDirection;
   field: string;
@@ -165,7 +168,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   private page: number | undefined;
   private limit: number | undefined;
   private cursorActive = false;
-  private cursor: string | number | Date | undefined;
+  private cursor: CursorValue | undefined;
   private cursorLimit: number | undefined;
   private cursorDirection: CursorDirection = 'forward';
   private cursorField: string = 'id';
@@ -302,8 +305,13 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * to run the query and obtain `next`/`prev` cursors.
    *
    * - `cursor` is the value of `cursorField` from the edge row of the previous
-   *   page (omit it for the first page). Strings, numbers and Dates are
+   *   page (omit it for the first page). Strings, numbers, bigints and Dates are
    *   accepted; Dates serialize to ISO-8601 in the returned cursors.
+   * - `cursorType` converts `cursor` to the type of `cursorField` before it reaches
+   *   Prisma: the returned `meta` cursors are strings, and Prisma rejects a string for an
+   *   `Int`/`BigInt`/`DateTime` field, so pass `'number'`, `'bigint'` or `'date'` when the
+   *   cursor comes back from a query string. Default `'string'` = pass through unchanged.
+   *   An unconvertible cursor throws here, before any query is sent.
    * - `direction` walks `'forward'` (next) or `'backward'` (previous).
    * - `cursorField` is the unique, sequential column to seek on (default `id`).
    *   Pair it with a matching {@link sortBy} for stable ordering.
@@ -313,7 +321,8 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * Takes precedence over {@link paginate} when both are set.
    */
   cursorPaginate(params: {
-    cursor?: string | number | Date | undefined;
+    cursor?: CursorValue | undefined;
+    cursorType?: CursorType;
     limit?: number;
     direction?: CursorDirection;
     cursorField?: OrderKeyOf<D> | (string & {});
@@ -321,7 +330,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   }): this {
     this.assertLimit(params.limit);
     this.cursorActive = true;
-    this.cursor = params.cursor;
+    this.cursor = coerceCursor(params.cursor, params.cursorType ?? 'string');
     this.cursorLimit = params.limit;
     this.cursorDirection = params.direction ?? 'forward';
     this.cursorField = params.cursorField ?? 'id';

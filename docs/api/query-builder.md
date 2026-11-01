@@ -167,7 +167,8 @@ Ignored whenever cursor mode is configured —
 
 ```ts
 cursorPaginate(params: {
-  cursor?: string | number | Date | undefined;
+  cursor?: string | number | bigint | Date | undefined;
+  cursorType?: CursorType;                      // 'string' (default) | 'number' | 'bigint' | 'date'
   limit?: number;
   direction?: CursorDirection;                  // 'forward' | 'backward'
   cursorField?: OrderKeyOf<D> | (string & {});  // default 'id'
@@ -177,13 +178,14 @@ cursorPaginate(params: {
 
 Configures seek pagination for [`.executeWithCursor()`](#executewithcursor).
 
-| Parameter     | Description                                                                                                                        |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `cursor`      | `cursorField` value from the previous page's edge row; omit for the first page. `Date`s serialize to ISO-8601 in returned cursors. |
-| `limit`       | Page size (clamped like `.paginate()`). Default 10.                                                                                |
-| `direction`   | `'forward'` (next pages) or `'backward'` (previous pages). Output order always follows the configured sort.                        |
-| `cursorField` | Unique, sequential column to seek on. Default `'id'`. Pair with a matching sort.                                                   |
-| `strict`      | One extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact.                                                             |
+| Parameter     | Description                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor`      | `cursorField` value from the previous page's edge row; omit for the first page. `Date`s serialize to ISO-8601 in returned cursors.          |
+| `cursorType`  | Converts `cursor` to the type of `cursorField` (`'number'`, `'bigint'`, `'date'`) before it reaches Prisma. Default `'string'` = unchanged. |
+| `limit`       | Page size (clamped like `.paginate()`). Default 10.                                                                                         |
+| `direction`   | `'forward'` (next pages) or `'backward'` (previous pages). Output order always follows the configured sort.                                 |
+| `cursorField` | Unique, sequential column to seek on. Default `'id'`. Pair with a matching sort.                                                            |
+| `strict`      | One extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact.                                                                      |
 
 Details, walking examples and guards:
 [Cursor pagination](../guides/cursor-pagination.md).

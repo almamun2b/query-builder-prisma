@@ -5,9 +5,10 @@ import type { PrismaModelDelegate } from '../../src/types/delegate';
  * satisfies the builder, any real Prisma delegate (any version) will too.
  */
 export interface FakeRow {
-  id: string;
+  id: string | number | bigint;
   email: string;
   status: string;
+  createdAt?: Date;
 }
 
 export interface FakeFindArgs {
@@ -29,24 +30,34 @@ export interface RecordedArgs {
   countArgs?: Record<string, unknown>;
 }
 
-/** Build n deterministic fake rows. */
-export function fakeRows(n: number): FakeRow[] {
+/**
+ * Build n deterministic fake rows. `idType` picks the id column type: `'string'` (`u0`, `u1`, ...),
+ * `'number'` (1..n, like an `Int` autoincrement id) or `'bigint'` (1n..nn).
+ */
+export function fakeRows(n: number, idType: 'string' | 'number' | 'bigint' = 'string'): FakeRow[] {
   return Array.from({ length: n }, (_, i) => ({
-    id: `u${i}`,
+    id: idType === 'string' ? `u${i}` : idType === 'number' ? i + 1 : BigInt(i + 1),
     email: `e${i}@x.dev`,
     status: 'ACTIVE',
   }));
 }
 
 /**
- * Cursor-cell match with Prisma's DateTime coercion: ISO strings are accepted
- * for Date cells (this is what makes serialized cursors round-trippable — the
- * exact property cursor serialization guarantees).
+ * Cursor-cell match with Prisma's DateTime coercion: ISO strings and Dates are accepted for Date
+ * cells (this is what makes serialized cursors round-trippable). Like Prisma's validation, any
+ * other cursor whose type does not match the column throws - a string `'5'` for an `Int` column is
+ * rejected ("Expected Int, provided String"), it does not silently match.
  */
 function matchesCursorCell(row: FakeRow, field: string, value: unknown): boolean {
   const cell: unknown = (row as unknown as Record<string, unknown>)[field];
   if (cell instanceof Date) {
-    return cell.toISOString() === String(value);
+    const wanted = value instanceof Date ? value.toISOString() : String(value);
+    return cell.toISOString() === wanted;
+  }
+  if (typeof cell !== typeof value) {
+    throw new Error(
+      `Argument \`${field}\`: Invalid value provided. Expected ${typeof cell}, provided ${typeof value}.`,
+    );
   }
   return cell === value;
 }

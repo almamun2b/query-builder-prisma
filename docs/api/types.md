@@ -72,6 +72,17 @@ Direction to walk through a cursor-paginated result set.
 type CursorDirection = 'forward' | 'backward';
 ```
 
+### `CursorType` / `CursorValue`
+
+How an incoming `cursor` is converted before it reaches Prisma, and the values
+`cursorPaginate()` accepts. The default `'string'` passes the cursor through
+unchanged.
+
+```ts
+type CursorType = 'string' | 'number' | 'bigint' | 'date';
+type CursorValue = string | number | bigint | Date;
+```
+
 ## Pagination metadata
 
 ### `PaginationMeta`

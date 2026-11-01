@@ -470,6 +470,99 @@ describe('QueryBuilder cursor pagination', () => {
     expect(recorded.findManyCalls[1]?.take).toBe(1);
   });
 
+  it('cursorType defaults to string: the cursor is passed through unchanged', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30, 'number'));
+    await new QueryBuilder(delegate).cursorPaginate({ cursor: 5, limit: 3 }).execute();
+    expect(recorded.findManyArgs?.cursor).toEqual({ id: 5 });
+  });
+
+  it('a string cursor for an Int column is rejected (the problem cursorType solves)', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30, 'number'));
+    await expect(
+      new QueryBuilder(delegate).cursorPaginate({ cursor: '5', limit: 3 }).executeWithCursor(),
+    ).rejects.toThrow('Expected number, provided string');
+  });
+
+  it("cursorType 'number' round-trips a numeric id through nextCursor", async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30, 'number'));
+    const page1 = await new QueryBuilder(delegate)
+      .cursorPaginate({ limit: 10 })
+      .executeWithCursor();
+    expect(page1.data.map((r) => r.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(page1.meta.nextCursor).toBe('10');
+
+    const page2 = await new QueryBuilder(delegate)
+      .cursorPaginate({
+        cursor: page1.meta.nextCursor ?? undefined,
+        cursorType: 'number',
+        limit: 10,
+      })
+      .executeWithCursor();
+    expect(recorded.findManyArgs?.cursor).toEqual({ id: 10 });
+    expect(page2.data.map((r) => r.id)).toEqual([11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+    expect(page2.meta.prevCursor).toBe('11');
+
+    const back = await new QueryBuilder(delegate)
+      .cursorPaginate({
+        cursor: page2.meta.prevCursor ?? undefined,
+        cursorType: 'number',
+        direction: 'backward',
+        limit: 10,
+      })
+      .executeWithCursor();
+    expect(back.data.map((r) => r.id)).toEqual(page1.data.map((r) => r.id));
+  });
+
+  it("cursorType 'bigint' coerces to a bigint cursor", async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30, 'bigint'));
+    const { data, meta } = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: '5', cursorType: 'bigint', limit: 2 })
+      .executeWithCursor();
+    expect(recorded.findManyArgs?.cursor).toEqual({ id: 5n });
+    expect(data.map((r) => r.id)).toEqual([6n, 7n]);
+    expect(meta.nextCursor).toBe('7');
+  });
+
+  it("cursorType 'date' turns the ISO cursor string back into a Date", async () => {
+    const rows = Array.from({ length: 6 }, (_, i) => ({
+      ...fakeRows(6)[i]!,
+      createdAt: new Date(Date.UTC(2026, 0, i + 1)),
+    }));
+    const { delegate, recorded } = createFakeDelegate(rows);
+    const page1 = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursorField: 'createdAt', limit: 2 })
+      .executeWithCursor();
+    expect(page1.meta.nextCursor).toBe('2026-01-02T00:00:00.000Z');
+    const page2 = await new QueryBuilder(delegate)
+      .cursorPaginate({
+        cursorField: 'createdAt',
+        cursor: page1.meta.nextCursor ?? undefined,
+        cursorType: 'date',
+        limit: 2,
+      })
+      .executeWithCursor();
+    expect(recorded.findManyArgs?.cursor).toEqual({
+      createdAt: new Date('2026-01-02T00:00:00.000Z'),
+    });
+    expect(page2.data.map((r) => r.id)).toEqual(['u2', 'u3']);
+  });
+
+  it('strict probe uses the coerced cursor too', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30, 'number'));
+    await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: '5', cursorType: 'number', limit: 2, strict: true })
+      .executeWithCursor();
+    expect(recorded.findManyCalls[1]?.cursor).toEqual({ id: 5 });
+  });
+
+  it('an invalid cursor throws at cursorPaginate(), before any query is sent', () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3, 'number'));
+    expect(() =>
+      new QueryBuilder(delegate).cursorPaginate({ cursor: 'abc', cursorType: 'number' }),
+    ).toThrow('"abc"');
+    expect(recorded.findManyCalls).toHaveLength(0);
+  });
+
   it('throws when a custom() omit drops the cursor field', async () => {
     const { delegate } = createFakeDelegate(fakeRows(5));
     await expect(

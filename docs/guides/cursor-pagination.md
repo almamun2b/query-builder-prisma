@@ -26,7 +26,8 @@ const { meta, data } = await new QueryBuilder(prisma.user)
 
 ```ts
 cursorPaginate(params: {
-  cursor?: string | number | Date | undefined;
+  cursor?: string | number | bigint | Date | undefined;
+  cursorType?: CursorType;                      // 'string' (default) | 'number' | 'bigint' | 'date'
   limit?: number;
   direction?: CursorDirection;                  // 'forward' (default) | 'backward'
   cursorField?: OrderKeyOf<D> | (string & {});  // default 'id'
@@ -34,13 +35,14 @@ cursorPaginate(params: {
 }): this
 ```
 
-| Parameter     | Meaning                                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------------------- |
-| `cursor`      | Value of `cursorField` from the edge row of the previous page. Omit it for the first page.                     |
-| `limit`       | Page size, clamped like [offset pagination](./pagination.md#clamping-and-limits). Default 10.                  |
-| `direction`   | `'forward'` walks toward later rows, `'backward'` toward earlier ones. Output order is unaffected (see below). |
-| `cursorField` | The unique, sequential column to seek on. Default `'id'`. Pair it with a matching sort.                        |
-| `strict`      | Spend one extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact (see [Strict mode](#strict-mode)). |
+| Parameter     | Meaning                                                                                                                                                              |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor`      | Value of `cursorField` from the edge row of the previous page. Omit it for the first page.                                                                           |
+| `cursorType`  | Converts `cursor` to the type of `cursorField` before it reaches Prisma (see [Numeric and date cursors](#numeric-and-date-cursors)). Default `'string'` = unchanged. |
+| `limit`       | Page size, clamped like [offset pagination](./pagination.md#clamping-and-limits). Default 10.                                                                        |
+| `direction`   | `'forward'` walks toward later rows, `'backward'` toward earlier ones. Output order is unaffected (see below).                                                       |
+| `cursorField` | The unique, sequential column to seek on. Default `'id'`. Pair it with a matching sort.                                                                              |
+| `strict`      | Spend one extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact (see [Strict mode](#strict-mode)).                                                       |
 
 Cursor mode **wins over offset mode** when both `.paginate()` and
 `.cursorPaginate()` are configured.
@@ -100,6 +102,31 @@ const prev = await new QueryBuilder(prisma.post)
 ```ts
 .cursorPaginate({ cursorField: 'createdAt', cursor: '2026-10-29T10:00:00.000Z' })
 ```
+
+## Numeric and date cursors
+
+`meta.nextCursor` / `meta.prevCursor` are always strings (`'42'`), but Prisma
+rejects a string for an `Int`, `BigInt` or `DateTime` cursor field
+(`Expected Int, provided String`). When the cursor comes back from a query
+string, tell the builder what the column holds with `cursorType`:
+
+```ts
+// GET /users?after=42      (id is an Int column)
+const { data, meta } = await new QueryBuilder(prisma.user)
+  .cursorPaginate({ cursor: req.query.after, cursorType: 'number', limit: 20 })
+  .executeWithCursor();
+// meta.nextCursor === '60' → send it to the client as a string, parse it the same way
+```
+
+| `cursorType`         | Conversion                     | Use for                    |
+| -------------------- | ------------------------------ | -------------------------- |
+| `'string'` (default) | none - passed through as given | `String`/`cuid`/`uuid` ids |
+| `'number'`           | `Number(cursor)`               | `Int` / `Float` columns    |
+| `'bigint'`           | `BigInt(cursor)`               | `BigInt` columns           |
+| `'date'`             | `new Date(cursor)`             | `DateTime` columns         |
+
+A cursor that cannot be converted (`'abc'` as a number) throws a descriptive
+error from `cursorPaginate()`, before any query is sent.
 
 ## Strict mode
 
