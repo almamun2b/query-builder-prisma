@@ -765,6 +765,16 @@ describe('QueryBuilder extras', () => {
     }
   });
 
+  it('custom select then custom include: only the select reaches the delegate', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate)
+      .custom({ select: { id: true } })
+      .custom({ include: { posts: true } })
+      .execute();
+    expect(recorded.findManyArgs?.select).toEqual({ id: true });
+    expect(recorded.findManyArgs?.include).toBeUndefined();
+  });
+
   it('a custom() include is sent when nothing explicit was set', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
     await new QueryBuilder(delegate).custom({ include: { posts: true } }).execute();

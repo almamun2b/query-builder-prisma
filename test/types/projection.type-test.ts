@@ -230,3 +230,28 @@ new QueryBuilder(userDelegate).select({ id: 'yes' });
 
 // @ts-expect-error - include values must be boolean or a nested spec, not a number
 new QueryBuilder(userDelegate).include({ posts: 1 });
+
+// --- cross-kind custom() calls follow the runtime: a held select beats a later include ---
+
+const _selectThenInclude = new QueryBuilder(userDelegate)
+  .custom({ select: { id: true } })
+  .custom({ include: { posts: true } })
+  .execute();
+const _24: Expect<Equal<Awaited<typeof _selectThenInclude>, { id: string }[]>> = true;
+
+// ...and a later select replaces a held include
+const _includeThenSelect = new QueryBuilder(userDelegate)
+  .custom({ include: { posts: true } })
+  .custom({ select: { id: true } })
+  .execute();
+const _25: Expect<Equal<Awaited<typeof _includeThenSelect>, { id: string }[]>> = true;
+
+// an undefined/null projection changes nothing
+declare const maybeSelect: { id: true } | undefined;
+const _undefinedSelect = new QueryBuilder(userDelegate)
+  .custom({ select: { email: true } })
+  .custom({ select: undefined })
+  .execute();
+const _26: Expect<Equal<Awaited<typeof _undefinedSelect>, { email: string }[]>> = true;
+const _maybe = new QueryBuilder(userDelegate).custom({ select: maybeSelect }).execute();
+const _27: Expect<Equal<Awaited<typeof _maybe>, { id: string }[]>> = true;

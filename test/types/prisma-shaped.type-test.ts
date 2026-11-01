@@ -100,3 +100,14 @@ const _p7: Expect<Equal<Awaited<typeof _passthroughCustom>, (ScalarUser & { post
 // no projection: the plain scalar row
 const _passthroughPlain = argAware.findMany(new QueryBuilder(argAware).buildArgs());
 const _p8: Expect<Equal<Awaited<typeof _passthroughPlain>, ScalarUser[]>> = true;
+
+// --- BuiltArgsOf directly ---
+
+import type { BuiltArgsOf } from '../../src/types/projection';
+
+type PlainArgs = BuiltArgsOf<ArgAwareDelegate, object>;
+const _b1: Expect<Equal<PlainArgs, Parameters<ArgAwareDelegate['findMany']>[0] & {}>> = true;
+type IncArgs = BuiltArgsOf<ArgAwareDelegate, { include: { posts: true } }>;
+const _b2: Expect<Equal<IncArgs['include'], { posts: true }>> = true;
+// @ts-expect-error - the wide optional select is replaced, not kept next to the tracked include
+const _b3: IncArgs['select'] = undefined;

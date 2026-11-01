@@ -104,7 +104,10 @@ anything not re-exported there does not exist for consumers.
 ## Runtime data flow (one query)
 
 1. Chain methods mutate private fields (`andConditions`, `orderBy`, `selectArg`,
-   pagination state, …). No I/O happens yet.
+   pagination state, …). No I/O happens yet. The exception is a method that
+   changes the result type - `select()`, `include()`, and `custom()` with a
+   projection: it works on a `clone()` and returns that, so differently-typed
+   chains never alias one object.
 2. `buildArgs()` folds state into `findMany` args with a fixed precedence:
    **explicit methods beat `custom()` args** (`.select()` over
    `custom({ select })`, `.paginate()`/`.cursorPaginate()` over

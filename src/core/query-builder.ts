@@ -81,17 +81,26 @@ type ExplicitProjection<TArgs> = Omit<
 >;
 
 /**
- * `TArgs` after `.custom(C)`: a literal `select`/`include` in `C` is tracked, but only when no
- * explicit `.select()`/`.include()` exists - explicit methods win at runtime, so the type must
- * not change after them. A later `.custom()` replaces an earlier one, as at runtime.
+ * `TArgs` after `.custom(C)`, mirroring `resolveProjection()`: a literal `select`/`include` in `C`
+ * is tracked only when no explicit `.select()`/`.include()` exists (explicit methods win at
+ * runtime). Among `custom()` calls a `select` beats an `include` regardless of order, a later
+ * call of the same kind replaces the earlier one, and an `undefined`/`null` value changes nothing.
  */
 type WithCustom<TArgs, C> = TArgs extends { select: unknown } | { include: unknown }
   ? TArgs
   : C extends { select: infer S }
-    ? Omit<TArgs, 'customSelect' | 'customInclude'> & { customSelect: S }
-    : C extends { include: infer I }
-      ? Omit<TArgs, 'customSelect' | 'customInclude'> & { customInclude: I }
-      : TArgs;
+    ? [NonNullable<S>] extends [never]
+      ? WithCustomInclude<TArgs, C>
+      : Omit<TArgs, 'customSelect' | 'customInclude'> & { customSelect: NonNullable<S> }
+    : WithCustomInclude<TArgs, C>;
+
+type WithCustomInclude<TArgs, C> = C extends { include: infer I }
+  ? [NonNullable<I>] extends [never]
+    ? TArgs
+    : TArgs extends { customSelect: unknown }
+      ? TArgs
+      : Omit<TArgs, 'customSelect' | 'customInclude'> & { customInclude: NonNullable<I> }
+  : TArgs;
 
 /** Resolved pagination handed to `compose()`; keeps the execute methods free of state writes. */
 type Paging = OffsetPaging | CursorPaging;

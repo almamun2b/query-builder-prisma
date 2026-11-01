@@ -104,7 +104,10 @@ export function coerceCursor(
     }
     return bad();
   }
-  const date = value instanceof Date ? value : new Date(value as string | number);
+  if (typeof value === 'bigint') {
+    return bad();
+  }
+  const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? bad() : date;
 }
 

@@ -258,6 +258,10 @@ describe('coerceCursor', () => {
     expect(coerceCursor(date, 'date')).toBe(date);
   });
 
+  it("'date' rejects a bigint with the friendly message, not a raw TypeError", () => {
+    expect(() => coerceCursor(5n, 'date')).toThrow("cursorType: 'date'");
+  });
+
   it("'date' rejects unparsable input", () => {
     expect(() => coerceCursor('nope', 'date')).toThrow('"nope"');
     expect(() => coerceCursor(new Date('nope'), 'date')).toThrow('date');
