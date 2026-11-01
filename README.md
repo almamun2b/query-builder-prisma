@@ -75,7 +75,7 @@ runtime dependencies.
 - **Dialect capability registry** — `mode: 'insensitive'` only where Prisma
   accepts it; new databases are one `registerDialect()` call.
 - **Hardened by default** — `undefined` stripping at any depth, prototype-key
-  refusal, clamped (or thrown) pagination numbers, a seed `where` that cannot
+  refusal (a thrown error, never a silent drop), clamped (or thrown) pagination numbers, a seed `where` that cannot
   be replaced.
 
 ### Offsetting and counting
@@ -145,8 +145,11 @@ Semantics you can build on (the tests pin these):
   it never replaces them.
 - **`custom()` strips `undefined`** — at any depth, so
   `custom({ distinct: undefined })` cannot overwrite an earlier value. Keys
-  named `__proto__`, `constructor` or `prototype` are refused (never written)
-  in `custom()`, `filter()` and dot-path expansion.
+  named `__proto__`, `constructor` or `prototype` **throw** (`Refused key "…"`)
+  in `custom()`, `filter()`, `where()` and dot-path expansion (`range`,
+  `sortBy`) - they are never written and never silently dropped, because
+  dropping a filter would widen the query. Empty input (`sortBy: ''`, empty
+  `searchText`, `fields: []`) stays a documented no-op.
 - **Sorting** — `.sortBy()` is single-key sugar and expands dot paths like
   `.range()` (`'avatar.size'` → `{ avatar: { size: 'desc' } }`); `.orderBy()`
   takes the full Prisma shape verbatim (arrays for multi-key, nested relation

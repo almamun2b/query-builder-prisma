@@ -80,7 +80,7 @@ filter(filters: FilterInput<D>): this
 
 Adds a partial Prisma `where`; `undefined` values are stripped, so optional
 query params can be forwarded directly. Dangerous keys
-(`__proto__`/`constructor`/`prototype`) are refused.
+(`__proto__`/`constructor`/`prototype`) throw.
 
 ```ts
 .filter({ role: dto.role, status: dto.status, deletedAt: undefined })
@@ -239,7 +239,7 @@ Merges raw `findMany` args (`distinct`, `cursor`, a `where`, …):
   runtime); pass literals - an argument held in a wide variable is not tracked;
 - a custom `where` is AND-ed with the `initialArgs` seed and previous custom
   `where`s — never replaces them;
-- `undefined` is stripped at any depth; dangerous keys are refused.
+- `undefined` is stripped at any depth; dangerous keys throw.
 
 ```ts
 .custom({ distinct: ['email'], where: { verified: true } })

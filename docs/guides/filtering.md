@@ -60,8 +60,9 @@ optional request fields can be forwarded as-is:
 
 `FilterInput<D>` allows every `where` key with possibly-`undefined` values —
 it exists exactly so you never need `?? undefined` gymnastics or manual
-cleanup. Keys named `__proto__`, `constructor` or `prototype` are refused
-(never written), which hardens builders fed from parsed JSON.
+cleanup. Keys named `__proto__`, `constructor` or `prototype` throw
+(`Refused key "…"`) rather than being written or silently dropped, which
+hardens builders fed from parsed JSON.
 
 ## `.range()` — `gte`/`lte` bounds
 
@@ -87,7 +88,7 @@ Behavior:
 - **To-many relations need `.where()` or `.custom()`** — use Prisma's relation
   filters directly: `.where({ posts: { some: { rating: { gte: 4 } } } })`.
 - Bounds left `undefined` are skipped; a path with a dangerous key
-  (`__proto__`/`constructor`/`prototype`) expands to nothing.
+  (`__proto__`/`constructor`/`prototype`) throws.
 
 ## `.where()` — the full typed `where`
 
