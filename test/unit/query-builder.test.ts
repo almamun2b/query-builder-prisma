@@ -614,7 +614,9 @@ describe('QueryBuilder cursor pagination', () => {
       findMany: async (args?: Parameters<typeof delegate.findMany>[0]) => {
         inFlight += 1;
         maxInFlight = Math.max(maxInFlight, inFlight);
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        // Yield so a second call can start before this one settles (no timers: no Node typings).
+        await Promise.resolve();
+        await Promise.resolve();
         try {
           return await delegate.findMany(args);
         } finally {
