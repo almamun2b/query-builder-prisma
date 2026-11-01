@@ -39,12 +39,49 @@ summarises the user-visible changes on the way to the next major release.
   keys optional, `custom({ select | include })` narrows the result, and the
   `buildArgs()` passthrough infers Prisma's exact result type.
 
+- `custom()` typing follows the runtime precedence: a held `select` beats a later
+  `include`, a later call of the same kind replaces the earlier one, and an
+  `undefined`/`null` projection changes nothing.
+- `cursorType: 'date'` rejects a `bigint` cursor with a clear message instead of
+  a raw `TypeError`.
+
+### Changed — tooling
+
+- TypeScript 6.0 (`~6.0.3`; TypeScript 7 waits for typescript-eslint support).
+  tsup's declaration build ignores the TS 6 `baseUrl` deprecation in its own
+  options only.
+- Local quality gates (husky): `pre-commit` runs Prettier on staged files,
+  typecheck and lint and refuses Claude identities; `commit-msg` runs commitlint
+  and rejects Claude attribution trailers; `pre-push` runs the tests. New
+  `format:check` script. The `commitlint` CI job was removed; the `verify` job
+  and the release workflow are unchanged.
+- Removed unused dev dependencies: `@types/node`, `conventional-commits-filter`,
+  `conventional-commits-parser`.
+- `docs/AUDIT.md` replaced with a fresh project audit (statuses, real-Prisma
+  verification, open items); references to the earlier audit were removed from
+  the docs, code comments and test titles.
+
 ### Added
 
+- `clone()` returns an independent copy of a builder for branching a base query.
 - `cursorPaginate({ cursorType: 'string' | 'number' | 'bigint' | 'date' })`
   converts a cursor read back from a query string (Prisma rejects a string for
   an `Int` cursor field); `cursor` also accepts `bigint`.
 - Exported types: `CursorType`, `CursorValue`, `ProjectionArgs`, `BuiltArgsOf`.
+
+## [0.2.1] — 2026-10-31
+
+### Changed
+
+- Fully automatic npm releases: semantic-release publishes on every push to
+  `main` whose Conventional Commits warrant a version (`fix:` patch, `feat:`
+  minor, `feat!:`/`BREAKING CHANGE:` major). It commits nothing back to the
+  protected branch; the latest `v*` tag is the version of record.
+- Commit messages are enforced as Conventional Commits with commitlint.
+- The docs hub moved from `docs/index.md` to `docs/readme.md`.
+- The CI Node matrix covers the current LTS lines (22 and 24); `esbuild`'s
+  install script is allowed in `package.json`, and commitlint's optional peers
+  are pinned so the lockfile installs under npm 10 and 11.
 
 ## [0.2.0] — 2026-10-30
 
