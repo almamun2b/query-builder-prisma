@@ -16,6 +16,13 @@ name: Release
 # npm) is the version source of truth; package.json on main is not bumped.
 # workflow_dispatch exists to re-run a failed release; semantic-release is
 # deterministic per commit range, so a re-run never double-publishes.
+#
+# Version 1.0.0 is burned: it was mis-released, then unpublished, and npm never
+# re-allows an unpublished version. If a BREAKING CHANGE ever makes this run
+# compute 1.0.0 (E400 "Cannot publish over previously published version"),
+# push a fence tag on the commit BEFORE the breaking one
+# (`git push origin <breaking-commit>~1:refs/tags/v1.0.0`) and re-run this
+# workflow (workflow_dispatch) — it then releases 2.0.0.
 
 on:
   push:
