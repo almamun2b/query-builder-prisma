@@ -269,10 +269,16 @@ describe('QueryBuilder strictNumbers', () => {
     ).rejects.toThrow('skip');
   });
 
-  it('caps skip silently by default', async () => {
+  it('serves an empty page beyond the skip cap and keeps meta.page truthful', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate).paginate({ page: 1e9, limit: 1000 }).execute();
-    expect(recorded.findManyArgs?.skip).toBe(100_000);
+    const { data, meta } = await new QueryBuilder(delegate)
+      .paginate({ page: 1e9, limit: 1000 })
+      .executeWithMeta();
+    expect(recorded.findManyArgs?.take).toBe(0);
+    expect(data).toEqual([]);
+    expect(meta.page).toBe(1e9);
+    expect(meta.limit).toBe(1000);
+    expect(meta.total).toBe(3);
   });
 
   it('throws the skip cap before the COUNT fires', async () => {

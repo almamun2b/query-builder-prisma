@@ -78,11 +78,11 @@ const total = await new QueryBuilder(prisma.user).filter({ status: 'ACTIVE' }).c
 Out-of-range numbers cannot reach the database unbounded. By default the
 builder clamps silently:
 
-| Input                            | Behavior                                                       |
-| -------------------------------- | -------------------------------------------------------------- |
-| `limit` outside `[1, 1000]`      | clamped into `[1, 1000]` (non-finite → 10)                     |
-| page below 1 (or non-finite)     | becomes page 1                                                 |
-| computed `skip` beyond `100_000` | capped at `100_000` — deep access should use cursor pagination |
+| Input                            | Behavior                                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `limit` outside `[1, 1000]`      | clamped into `[1, 1000]` (non-finite → 10)                                               |
+| page below 1 (or non-finite)     | becomes page 1                                                                           |
+| computed `skip` beyond `100_000` | empty page (`take: 0`), `meta.page` unchanged — deep access should use cursor pagination |
 
 With `strictNumbers: true` on the constructor, all of the above **throw
 instead** — including a computed skip beyond the cap, which fails before the

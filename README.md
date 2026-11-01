@@ -167,8 +167,9 @@ Semantics you can build on (the tests pin these):
 - **Cursor projection guard** — `executeWithCursor()` throws when a `.select()`
   projection drops `cursorField` (cursors would be built from `undefined`).
 - **Clamping** — `limit` is clamped silently to `[1, 1000]`; pages below 1
-  become page 1; computed `skip` is capped at `100_000` (deep access → cursor
-  pagination). With `new QueryBuilder(delegate, { strictNumbers: true })` all of
+  become page 1; a page whose computed `skip` exceeds `100_000` is served as an
+  **empty page** (`take: 0`) with `meta.page` still the requested page — never as
+  a different page (deep access → cursor pagination). With `new QueryBuilder(delegate, { strictNumbers: true })` all of
   these throw instead of clamping.
 - **`includeTotal`** — `executeWithMeta({ includeTotal: false })` skips the
   `COUNT` query; `meta` then carries `total: null` / `totalPage: null`.

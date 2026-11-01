@@ -155,7 +155,8 @@ paginate(params: { page?: number; limit?: number }): this
 
 Configures offset pagination: 1-based `page` (default 1) and page size
 `limit` (default 10). Inputs are clamped — limits into `[1, 1000]`, pages
-below 1 become 1, computed `skip` capped at `100,000`; with `strictNumbers: true`
+below 1 become 1, a page whose computed `skip` exceeds `100,000` returns an
+empty page (`take: 0`, truthful `meta.page`); with `strictNumbers: true`
 all of these throw instead (see
 [Offset pagination](../guides/pagination.md#clamping-and-limits)).
 

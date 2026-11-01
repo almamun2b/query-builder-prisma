@@ -30,9 +30,17 @@ describe('toOffsetArgs', () => {
     expect(args.page).toBe(1);
     expect(args.limit).toBe(1);
   });
-  it('caps skip at MAX_SKIP', () => {
-    expect(toOffsetArgs(1e9, 1000).skip).toBe(MAX_SKIP);
+  it('serves an empty page (take 0) instead of a different page once skip passes MAX_SKIP', () => {
     expect(MAX_SKIP).toBe(100_000);
+    const beyond = toOffsetArgs(1e9, 1000);
+    expect(beyond.take).toBe(0);
+    expect(beyond.skip).toBe(MAX_SKIP);
+    expect(beyond.page).toBe(1e9);
+    expect(beyond.limit).toBe(1000);
+  });
+  it('a skip exactly at MAX_SKIP is still served', () => {
+    expect(toOffsetArgs(101, 1000)).toEqual({ take: 1000, skip: 100_000, page: 101, limit: 1000 });
+    expect(toOffsetArgs(102, 1000).take).toBe(0);
   });
 });
 

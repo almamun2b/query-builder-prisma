@@ -6,7 +6,7 @@ import type { CursorDirection, CursorMeta, PaginationMeta } from '../types/publi
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_PAGE_SIZE = 1000;
-/** Upper bound for offset `skip` so deep pages cannot hit the DB unbounded. */
+/** Upper bound for offset `skip` so deep pages cannot hit the DB unbounded (beyond it: empty page). */
 export const MAX_SKIP = 100_000;
 
 /** Clamp a page size to `[1, MAX_PAGE_SIZE]`; non-finite input gets the default. */
@@ -25,14 +25,21 @@ export function clampPage(page: number): number {
   return Math.max(1, Math.floor(page));
 }
 
-/** `skip`/`take` for a 1-based page + page size (both clamped, `skip` capped). */
+/**
+ * `skip`/`take` for a 1-based page + page size (both clamped). Pages whose `skip` would pass
+ * {@link MAX_SKIP} are not served as some other page: they get `take: 0` (an empty page) and
+ * `page` stays the requested one, so the result never claims rows it does not hold.
+ */
 export function toOffsetArgs(
   page: number,
   limit: number,
 ): { take: number; skip: number; page: number; limit: number } {
   const safePage = clampPage(page);
   const safeLimit = clampLimit(limit);
-  const skip = Math.min((safePage - 1) * safeLimit, MAX_SKIP);
+  const skip = (safePage - 1) * safeLimit;
+  if (skip > MAX_SKIP) {
+    return { take: 0, skip: MAX_SKIP, page: safePage, limit: safeLimit };
+  }
   return { take: safeLimit, skip, page: safePage, limit: safeLimit };
 }
 
