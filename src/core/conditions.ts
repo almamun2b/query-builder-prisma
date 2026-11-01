@@ -1,21 +1,27 @@
 /** Build-time condition assembly helpers used by the QueryBuilder core. */
 
 /**
- * Keys we refuse to write into objects we build: computed-key assignment on
- * `'__proto__'` would set a local prototype instead of an own property
- * (audit F16 — reachable via JSON-parsed request bodies).
+ * Keys we refuse to build into queries: assigning `'__proto__'` would set a prototype instead of
+ * an own property (reachable via JSON-parsed request bodies). A refused key THROWS - silently
+ * dropping it would turn a restricted query into a wider one.
  */
 const DANGEROUS_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 
-function isSafeKey(key: string): boolean {
-  return !DANGEROUS_KEYS.has(key);
+function assertSafeKey(key: string): void {
+  if (DANGEROUS_KEYS.has(key)) {
+    throw new Error(
+      `Refused key "${key}": it can pollute object prototypes. Remove it from the input ` +
+        '(filters, ranges, sort paths and custom args) instead of passing user data through unchecked.',
+    );
+  }
 }
 
 /** Strip `undefined` values so optional query params can be passed directly. */
 export function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined && isSafeKey(key)) {
+    assertSafeKey(key);
+    if (value !== undefined) {
       result[key] = value;
     }
   }
@@ -27,12 +33,13 @@ export function stripUndefined(obj: Record<string, unknown>): Record<string, unk
  * objects without `undefined` values at any depth. Values that are not plain
  * objects (Date, BigInt, class instances like Decimal) pass through untouched
  * and the input is never mutated. Used by `.custom()` so a later
- * `custom({ key: undefined })` cannot overwrite an earlier value (audit F15).
+ * `custom({ key: undefined })` cannot overwrite an earlier value.
  */
 export function deepStripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined || !isSafeKey(key)) {
+    assertSafeKey(key);
+    if (value === undefined) {
       continue;
     }
     result[key] = isDeepStrippable(value)
@@ -60,12 +67,13 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
 
 /**
  * Expand `'avatar.size'` + a leaf value into `{ avatar: { size: leaf } }`.
- * Empty segments are skipped; a path containing a `__proto__`/`constructor`/
- * `prototype` segment expands to `{}` — refused, never written (audit F16).
+ * Empty segments are skipped (a path of only empty segments expands to `{}`); a path
+ * containing a `__proto__`/`constructor`/`prototype` segment throws.
  */
 export function expandDotPath(path: string, leaf: unknown): Record<string, unknown> {
   const keys = path.split('.').filter((key) => key.length > 0);
-  if (keys.length === 0 || keys.some((key) => !isSafeKey(key))) {
+  keys.forEach(assertSafeKey);
+  if (keys.length === 0) {
     return {};
   }
   let current: unknown = leaf;

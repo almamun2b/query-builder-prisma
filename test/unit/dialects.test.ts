@@ -20,7 +20,7 @@ describe('resolveDialect', () => {
     expect(resolveDialect('mongodb').name).toBe('mongodb');
     expect(resolveDialect().name).toBe('postgresql');
   });
-  it('unknown names report universal for name AND capabilities (audit G8)', () => {
+  it('unknown names report universal for name AND capabilities', () => {
     const resolved = resolveDialect('not-a-db');
     expect(resolved.name).toBe('universal');
     expect(resolved.capabilities.caseInsensitiveMode).toBe(false);
@@ -29,7 +29,7 @@ describe('resolveDialect', () => {
     setDialectDetector(() => 'mysql');
     expect(resolveDialect().name).toBe('mysql');
   });
-  it('a registered detector returning undefined falls through to universal (audit G2)', () => {
+  it('a registered detector returning undefined falls through to universal', () => {
     setDialectDetector(() => undefined);
     expect(resolveDialect().name).toBe('universal');
     expect(resolveDialect().capabilities.caseInsensitiveMode).toBe(false);
@@ -40,7 +40,7 @@ describe('resolveDialect', () => {
   });
 });
 
-describe('dialect state sharing (audit F7)', () => {
+describe('dialect state sharing', () => {
   it('lives on globalThis under the shared symbol, so ESM+CJS copies converge', () => {
     const key = Symbol.for('query-builder-prisma.dialect-state');
     const host = globalThis as unknown as Record<symbol, { globalDialect?: string } | undefined>;

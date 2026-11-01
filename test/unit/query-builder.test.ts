@@ -58,13 +58,22 @@ describe('QueryBuilder conditions', () => {
     expect(recorded.findManyArgs?.where).toEqual({ avatar: { size: { gte: 5 } } });
   });
 
-  it('range adds nothing for a dangerous path (audit F16)', async () => {
-    const { delegate, recorded } = createFakeDelegate(fakeRows(2));
-    await new QueryBuilder(delegate)
-      .range({ 'a.__proto__.size': { from: 5 } })
-      .filter({ status: 'ACTIVE' })
-      .execute();
-    expect(recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
+  it('range throws for a dangerous path instead of widening the query', () => {
+    const { delegate } = createFakeDelegate(fakeRows(2));
+    expect(() => new QueryBuilder(delegate).range({ 'a.__proto__.size': { from: 5 } })).toThrow(
+      'Refused key "__proto__"',
+    );
+  });
+
+  it('filter, where and custom throw on a hostile request body', () => {
+    const { delegate } = createFakeDelegate(fakeRows(2));
+    const hostile = JSON.parse('{"status":"ACTIVE","__proto__":{"x":1}}') as Record<
+      string,
+      unknown
+    >;
+    expect(() => new QueryBuilder(delegate).filter(hostile)).toThrow('Refused key');
+    expect(() => new QueryBuilder(delegate).where(hostile)).toThrow('Refused key');
+    expect(() => new QueryBuilder(delegate).custom({ where: hostile })).toThrow('Refused key');
   });
 
   it('seeded initialArgs where is ANDed first', async () => {
@@ -78,8 +87,8 @@ describe('QueryBuilder conditions', () => {
   });
 });
 
-describe('QueryBuilder search robustness (audits F13, G7)', () => {
-  it('OR arms do not share one match object reference (audit F13)', async () => {
+describe('QueryBuilder search robustness', () => {
+  it('OR arms do not share one match object reference', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
     await new QueryBuilder(delegate)
       .search({ searchText: 'jo', fields: ['email', 'id'] })
@@ -88,14 +97,14 @@ describe('QueryBuilder search robustness (audits F13, G7)', () => {
     expect(where.OR[0].email).not.toBe(where.OR[1].id);
   });
 
-  it('whitespace-only searchText adds no condition (audit G7)', async () => {
+  it('whitespace-only searchText adds no condition', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
     await new QueryBuilder(delegate).search({ searchText: '   ', fields: ['email'] }).execute();
     expect(recorded.findManyArgs?.where).toBeUndefined();
   });
 });
 
-describe('QueryBuilder custom where merge (audit F2)', () => {
+describe('QueryBuilder custom where merge', () => {
   it('custom where is ANDed with the initialArgs seed, never replaces it', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
     await new QueryBuilder(delegate, { initialArgs: { where: { deletedAt: null } } })
@@ -135,7 +144,7 @@ describe('QueryBuilder custom where merge (audit F2)', () => {
   });
 });
 
-describe('QueryBuilder custom undefined strip (audit F15)', () => {
+describe('QueryBuilder custom undefined strip', () => {
   it('custom({ distinct: undefined }) does not overwrite an earlier distinct', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
     await new QueryBuilder(delegate)
@@ -147,9 +156,7 @@ describe('QueryBuilder custom undefined strip (audit F15)', () => {
 
   it('strips nested undefined values in custom args', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate)
-      .custom({ cursor: { id: 'u1', extra: undefined } })
-      .execute();
+    await new QueryBuilder(delegate).custom({ cursor: { id: 'u1', extra: undefined } }).execute();
     expect(recorded.findManyArgs?.cursor).toEqual({ id: 'u1' });
   });
 
@@ -162,8 +169,8 @@ describe('QueryBuilder custom undefined strip (audit F15)', () => {
   });
 });
 
-describe('QueryBuilder sorting (audits F6, G1)', () => {
-  it('sortBy expands dot paths into nested orderBy (audit F6)', async () => {
+describe('QueryBuilder sorting', () => {
+  it('sortBy expands dot paths into nested orderBy', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
     await new QueryBuilder(delegate).sortBy({ sortBy: 'avatar.size', sortOrder: 'asc' }).execute();
     expect(recorded.findManyArgs?.orderBy).toEqual({ avatar: { size: 'asc' } });
@@ -175,13 +182,20 @@ describe('QueryBuilder sorting (audits F6, G1)', () => {
     expect(recorded.findManyArgs?.orderBy).toEqual({ createdAt: 'desc' });
   });
 
-  it('sortBy adds nothing for a dangerous path (audit F16)', async () => {
+  it('sortBy throws for a dangerous path', () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    expect(() => new QueryBuilder(delegate).sortBy({ sortBy: 'a.__proto__.b' })).toThrow(
+      'Refused key "__proto__"',
+    );
+  });
+
+  it('an empty sortBy stays a no-op', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate).sortBy({ sortBy: 'a.__proto__.b' }).execute();
+    await new QueryBuilder(delegate).sortBy({ sortBy: '' }).execute();
     expect(recorded.findManyArgs?.orderBy).toBeUndefined();
   });
 
-  it('orderBy sends multi-key orderBy verbatim (audit G1)', async () => {
+  it('orderBy sends multi-key orderBy verbatim', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
     await new QueryBuilder(delegate).orderBy([{ id: 'asc' }, { email: 'desc' }]).execute();
     expect(recorded.findManyArgs?.orderBy).toEqual([{ id: 'asc' }, { email: 'desc' }]);
@@ -219,7 +233,7 @@ describe('QueryBuilder offset pagination', () => {
     expect(data).toHaveLength(10);
   });
 
-  it('executeWithMeta throws under cursor mode and never calls the delegate (audit F1)', async () => {
+  it('executeWithMeta throws under cursor mode and never calls the delegate', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(5));
     await expect(
       new QueryBuilder(delegate).cursorPaginate({ limit: 3 }).executeWithMeta(),
@@ -228,7 +242,7 @@ describe('QueryBuilder offset pagination', () => {
     expect(recorded.countArgs).toBeUndefined();
   });
 
-  it('includeTotal: false skips the COUNT query (audit G3)', async () => {
+  it('includeTotal: false skips the COUNT query', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(40));
     const { meta, data } = await new QueryBuilder(delegate).executeWithMeta({
       includeTotal: false,
@@ -239,7 +253,7 @@ describe('QueryBuilder offset pagination', () => {
   });
 });
 
-describe('QueryBuilder strictNumbers (audits F12, F18)', () => {
+describe('QueryBuilder strictNumbers', () => {
   it('throws on out-of-range limit when enabled', () => {
     const { delegate } = createFakeDelegate(fakeRows(3));
     expect(() =>
@@ -251,9 +265,9 @@ describe('QueryBuilder strictNumbers (audits F12, F18)', () => {
     expect(() =>
       new QueryBuilder(delegate, { strictNumbers: true }).cursorPaginate({ limit: 2000 }),
     ).toThrow('strictNumbers');
-    expect(() =>
-      new QueryBuilder(delegate, { strictNumbers: true }).paginate({ page: 0 }),
-    ).toThrow('strictNumbers');
+    expect(() => new QueryBuilder(delegate, { strictNumbers: true }).paginate({ page: 0 })).toThrow(
+      'strictNumbers',
+    );
   });
 
   it('still clamps silently by default', async () => {
@@ -262,7 +276,7 @@ describe('QueryBuilder strictNumbers (audits F12, F18)', () => {
     expect(recorded.findManyArgs?.take).toBe(1000);
   });
 
-  it('throws when the computed skip exceeds the cap (audit F18)', async () => {
+  it('throws when the computed skip exceeds the cap', async () => {
     const { delegate } = createFakeDelegate(fakeRows(3));
     await expect(
       new QueryBuilder(delegate, { strictNumbers: true })
@@ -271,13 +285,19 @@ describe('QueryBuilder strictNumbers (audits F12, F18)', () => {
     ).rejects.toThrow('skip');
   });
 
-  it('caps skip silently by default (audit F18)', async () => {
+  it('serves an empty page beyond the skip cap and keeps meta.page truthful', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate).paginate({ page: 1e9, limit: 1000 }).execute();
-    expect(recorded.findManyArgs?.skip).toBe(100_000);
+    const { data, meta } = await new QueryBuilder(delegate)
+      .paginate({ page: 1e9, limit: 1000 })
+      .executeWithMeta();
+    expect(recorded.findManyArgs?.take).toBe(0);
+    expect(data).toEqual([]);
+    expect(meta.page).toBe(1e9);
+    expect(meta.limit).toBe(1000);
+    expect(meta.total).toBe(3);
   });
 
-  it('throws the skip cap before the COUNT fires (audit F18)', async () => {
+  it('throws the skip cap before the COUNT fires', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
     await expect(
       new QueryBuilder(delegate, { strictNumbers: true })
@@ -321,9 +341,61 @@ describe('QueryBuilder cursor pagination', () => {
     expect(recorded.findManyArgs?.skip).toBe(1);
   });
 
-  it('next cursor round-trips to the following page without overlap (audit F4)', async () => {
+  it('backward page returns the rows just before the cursor, in sort order', async () => {
     const { delegate } = createFakeDelegate(fakeRows(30));
-    const page1 = await new QueryBuilder(delegate).cursorPaginate({ limit: 10 }).executeWithCursor();
+    const { data, meta } = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: 'u25', direction: 'backward', limit: 10 })
+      .executeWithCursor();
+    expect(data.map((r) => r.id)).toEqual([
+      'u15',
+      'u16',
+      'u17',
+      'u18',
+      'u19',
+      'u20',
+      'u21',
+      'u22',
+      'u23',
+      'u24',
+    ]);
+    expect(meta.hasPrevPage).toBe(true);
+    expect(meta.prevCursor).toBe('u15');
+    expect(meta.nextCursor).toBe('u24');
+  });
+
+  it('backward page near the start has no previous page', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    const { data, meta } = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: 'u4', direction: 'backward', limit: 10 })
+      .executeWithCursor();
+    expect(data.map((r) => r.id)).toEqual(['u0', 'u1', 'u2', 'u3']);
+    expect(meta.hasPrevPage).toBe(false);
+    expect(meta.prevCursor).toBeNull();
+  });
+
+  it('walking forward then backward revisits the same page', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    const page1 = await new QueryBuilder(delegate)
+      .cursorPaginate({ limit: 10 })
+      .executeWithCursor();
+    const page2 = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: page1.meta.nextCursor ?? undefined, limit: 10 })
+      .executeWithCursor();
+    const back = await new QueryBuilder(delegate)
+      .cursorPaginate({
+        cursor: page2.meta.prevCursor ?? undefined,
+        limit: 10,
+        direction: 'backward',
+      })
+      .executeWithCursor();
+    expect(back.data.map((r) => r.id)).toEqual(page1.data.map((r) => r.id));
+  });
+
+  it('next cursor round-trips to the following page without overlap', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    const page1 = await new QueryBuilder(delegate)
+      .cursorPaginate({ limit: 10 })
+      .executeWithCursor();
     expect(page1.meta.nextCursor).toBe('u9');
     expect(page1.data[9]?.id).toBe('u9');
     const page2 = await new QueryBuilder(delegate)
@@ -333,7 +405,7 @@ describe('QueryBuilder cursor pagination', () => {
     expect(page2.meta.hasPrevPage).toBe(true);
   });
 
-  it('throws when the select drops the cursorField (audit F5)', async () => {
+  it('throws when the select drops the cursorField', async () => {
     const { delegate } = createFakeDelegate(fakeRows(5));
     await expect(
       new QueryBuilder(delegate)
@@ -343,7 +415,7 @@ describe('QueryBuilder cursor pagination', () => {
     ).rejects.toThrow('projection drops cursorField');
   });
 
-  it('passes when the select keeps the cursorField (audit F5)', async () => {
+  it('passes when the select keeps the cursorField', async () => {
     const { delegate } = createFakeDelegate(fakeRows(5));
     const { data } = await new QueryBuilder(delegate)
       .select({ id: true, email: true })
@@ -352,7 +424,7 @@ describe('QueryBuilder cursor pagination', () => {
     expect(data).toHaveLength(5);
   });
 
-  it('also guards a select supplied via custom() (audit F5)', async () => {
+  it('also guards a select supplied via custom()', async () => {
     const { delegate } = createFakeDelegate(fakeRows(5));
     await expect(
       new QueryBuilder(delegate)
@@ -362,7 +434,7 @@ describe('QueryBuilder cursor pagination', () => {
     ).rejects.toThrow('projection drops cursorField');
   });
 
-  it('strict mode makes hasPrevPage exact when the cursor sits on the first row (audit F10)', async () => {
+  it('strict mode makes hasPrevPage exact when the cursor sits on the first row', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(30));
     const { meta } = await new QueryBuilder(delegate)
       .cursorPaginate({ cursor: 'u0', limit: 5, strict: true })
@@ -375,7 +447,7 @@ describe('QueryBuilder cursor pagination', () => {
     expect(probe?.skip).toBe(1);
   });
 
-  it('strict probe mirrors the query where and orderBy (audit F10)', async () => {
+  it('strict probe mirrors the query where and orderBy', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(30));
     await new QueryBuilder(delegate)
       .filter({ status: 'ACTIVE' })
@@ -388,7 +460,7 @@ describe('QueryBuilder cursor pagination', () => {
     expect(probe?.take).toBe(-1);
   });
 
-  it('strict mode makes hasNextPage exact on an empty backward page (audit G9)', async () => {
+  it('strict mode makes hasNextPage exact on an empty backward page', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(30));
     const { data, meta } = await new QueryBuilder(delegate)
       .cursorPaginate({ cursor: 'u0', limit: 5, direction: 'backward', strict: true })
@@ -398,10 +470,251 @@ describe('QueryBuilder cursor pagination', () => {
     expect(recorded.findManyCalls[1]?.take).toBe(1);
   });
 
-  it('no probe query without strict (audit F10)', async () => {
+  it('cursorType defaults to string: the cursor is passed through unchanged', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30, 'number'));
+    await new QueryBuilder(delegate).cursorPaginate({ cursor: 5, limit: 3 }).execute();
+    expect(recorded.findManyArgs?.cursor).toEqual({ id: 5 });
+  });
+
+  it('a string cursor for an Int column is rejected (the problem cursorType solves)', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30, 'number'));
+    await expect(
+      new QueryBuilder(delegate).cursorPaginate({ cursor: '5', limit: 3 }).executeWithCursor(),
+    ).rejects.toThrow('Expected number, provided string');
+  });
+
+  it("cursorType 'number' round-trips a numeric id through nextCursor", async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30, 'number'));
+    const page1 = await new QueryBuilder(delegate)
+      .cursorPaginate({ limit: 10 })
+      .executeWithCursor();
+    expect(page1.data.map((r) => r.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(page1.meta.nextCursor).toBe('10');
+
+    const page2 = await new QueryBuilder(delegate)
+      .cursorPaginate({
+        cursor: page1.meta.nextCursor ?? undefined,
+        cursorType: 'number',
+        limit: 10,
+      })
+      .executeWithCursor();
+    expect(recorded.findManyArgs?.cursor).toEqual({ id: 10 });
+    expect(page2.data.map((r) => r.id)).toEqual([11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+    expect(page2.meta.prevCursor).toBe('11');
+
+    const back = await new QueryBuilder(delegate)
+      .cursorPaginate({
+        cursor: page2.meta.prevCursor ?? undefined,
+        cursorType: 'number',
+        direction: 'backward',
+        limit: 10,
+      })
+      .executeWithCursor();
+    expect(back.data.map((r) => r.id)).toEqual(page1.data.map((r) => r.id));
+  });
+
+  it("cursorType 'bigint' coerces to a bigint cursor", async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30, 'bigint'));
+    const { data, meta } = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: '5', cursorType: 'bigint', limit: 2 })
+      .executeWithCursor();
+    expect(recorded.findManyArgs?.cursor).toEqual({ id: 5n });
+    expect(data.map((r) => r.id)).toEqual([6n, 7n]);
+    expect(meta.nextCursor).toBe('7');
+  });
+
+  it("cursorType 'date' turns the ISO cursor string back into a Date", async () => {
+    const rows = Array.from({ length: 6 }, (_, i) => ({
+      ...fakeRows(6)[i]!,
+      createdAt: new Date(Date.UTC(2026, 0, i + 1)),
+    }));
+    const { delegate, recorded } = createFakeDelegate(rows);
+    const page1 = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursorField: 'createdAt', limit: 2 })
+      .executeWithCursor();
+    expect(page1.meta.nextCursor).toBe('2026-01-02T00:00:00.000Z');
+    const page2 = await new QueryBuilder(delegate)
+      .cursorPaginate({
+        cursorField: 'createdAt',
+        cursor: page1.meta.nextCursor ?? undefined,
+        cursorType: 'date',
+        limit: 2,
+      })
+      .executeWithCursor();
+    expect(recorded.findManyArgs?.cursor).toEqual({
+      createdAt: new Date('2026-01-02T00:00:00.000Z'),
+    });
+    expect(page2.data.map((r) => r.id)).toEqual(['u2', 'u3']);
+  });
+
+  it('strict probe uses the coerced cursor too', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30, 'number'));
+    await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: '5', cursorType: 'number', limit: 2, strict: true })
+      .executeWithCursor();
+    expect(recorded.findManyCalls[1]?.cursor).toEqual({ id: 5 });
+  });
+
+  it('an invalid cursor throws at cursorPaginate(), before any query is sent', () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3, 'number'));
+    expect(() =>
+      new QueryBuilder(delegate).cursorPaginate({ cursor: 'abc', cursorType: 'number' }),
+    ).toThrow('"abc"');
+    expect(recorded.findManyCalls).toHaveLength(0);
+  });
+
+  it('throws when a custom() omit drops the cursor field', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(5));
+    await expect(
+      new QueryBuilder(delegate).custom({ omit: { id: true } }).executeWithCursor(),
+    ).rejects.toThrow('cursorField "id"');
+  });
+
+  it('throws instead of emitting a bogus cursor for an unknown cursorField', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    await expect(
+      new QueryBuilder(delegate)
+        .cursorPaginate({ cursorField: 'nope', limit: 5 })
+        .executeWithCursor(),
+    ).rejects.toThrow('cursorField "nope"');
+  });
+
+  it('strict probe inherits seeded orderBy, distinct and where from the main query', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate, { initialArgs: { orderBy: { email: 'desc' } } })
+      .filter({ status: 'ACTIVE' })
+      .custom({ distinct: ['email'] })
+      .cursorPaginate({ cursor: 'u5', limit: 3, strict: true })
+      .executeWithCursor();
+    const probe = recorded.findManyCalls[1];
+    expect(probe?.orderBy).toEqual({ email: 'desc' });
+    expect(probe?.distinct).toEqual(['email']);
+    expect(probe?.where).toEqual({ status: 'ACTIVE' });
+    expect(probe?.take).toBe(-1);
+    expect(probe?.cursor).toEqual({ id: 'u5' });
+    expect(probe?.skip).toBe(1);
+  });
+
+  it('strict probe fetches only the cursor field, never a projection or include', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate)
+      .include({ posts: true })
+      .cursorPaginate({ cursor: 'u5', limit: 3, strict: true })
+      .executeWithCursor();
+    const probe = recorded.findManyCalls[1];
+    expect(probe?.select).toEqual({ id: true });
+    expect(probe?.include).toBeUndefined();
+  });
+
+  it('strict probe and main query run concurrently', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const slow = {
+      findMany: async (args?: Parameters<typeof delegate.findMany>[0]) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        // Yield so a second call can start before this one settles (no timers: no Node typings).
+        await Promise.resolve();
+        await Promise.resolve();
+        try {
+          return await delegate.findMany(args);
+        } finally {
+          inFlight -= 1;
+        }
+      },
+      count: delegate.count,
+    };
+    await new QueryBuilder(slow)
+      .cursorPaginate({ cursor: 'u5', limit: 3, strict: true })
+      .executeWithCursor();
+    expect(maxInFlight).toBe(2);
+  });
+
+  it('custom cursor/skip do not leak into cursor mode when no cursor was given', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate)
+      .custom({ cursor: { id: 'u9' }, skip: 4 })
+      .cursorPaginate({ limit: 3 })
+      .execute();
+    expect(recorded.findManyArgs?.cursor).toBeUndefined();
+    expect(recorded.findManyArgs?.skip).toBeUndefined();
+  });
+
+  it('no probe query without strict', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(30));
     await new QueryBuilder(delegate).cursorPaginate({ cursor: 'u0', limit: 5 }).executeWithCursor();
     expect(recorded.findManyCalls).toHaveLength(1);
+  });
+});
+
+describe('QueryBuilder clone semantics', () => {
+  it('two select() calls on one base build independent queries', async () => {
+    const a = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(a.delegate).filter({ status: 'ACTIVE' });
+    const withId = base.select({ id: true });
+    const withEmail = base.select({ email: true });
+
+    await withId.execute();
+    expect(a.recorded.findManyArgs?.select).toEqual({ id: true });
+    await withEmail.execute();
+    expect(a.recorded.findManyArgs?.select).toEqual({ email: true });
+    await base.execute();
+    expect(a.recorded.findManyArgs?.select).toBeUndefined();
+    expect(a.recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
+  });
+
+  it('select() and include() return a new builder; the base is left untouched', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(delegate);
+    const selected = base.select({ id: true });
+    const included = base.include({ posts: true });
+    expect(selected).not.toBe(base);
+    expect(included).not.toBe(base);
+    await base.execute();
+    expect(recorded.findManyArgs?.select).toBeUndefined();
+    expect(recorded.findManyArgs?.include).toBeUndefined();
+  });
+
+  it('a clone does not share later conditions with its origin', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(delegate).filter({ status: 'ACTIVE' });
+    const branch = base.select({ id: true }).filter({ email: 'a@x.dev' });
+    await branch.execute();
+    expect(recorded.findManyArgs?.where).toEqual({
+      AND: [{ status: 'ACTIVE' }, { email: 'a@x.dev' }],
+    });
+    await base.execute();
+    expect(recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
+  });
+
+  it('clone() copies filters, sorting, pagination, custom args and cursor settings', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    const base = new QueryBuilder(delegate, { initialArgs: { where: { status: 'ACTIVE' } } })
+      .filter({ email: 'a@x.dev' })
+      .sortBy({ sortBy: 'email', sortOrder: 'asc' })
+      .custom({ distinct: ['email'] })
+      .cursorPaginate({ cursor: 'u5', limit: 3, direction: 'backward', strict: true });
+    const copy = base.clone();
+    expect(copy).not.toBe(base);
+    expect(copy.buildArgs()).toEqual(base.buildArgs());
+    await copy.executeWithCursor();
+    expect(recorded.findManyCalls).toHaveLength(2); // strict flag carried over: main + probe
+  });
+
+  it('custom() with a projection returns a new builder, without one it returns the same', () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(delegate);
+    expect(base.custom({ select: { id: true } })).not.toBe(base);
+    expect(base.custom({ distinct: ['email'] })).toBe(base);
+    expect(base.buildArgs()).toEqual({ distinct: ['email'] });
+  });
+
+  it('chain methods that keep the result type still mutate and return this', () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    const base = new QueryBuilder(delegate);
+    expect(base.filter({ status: 'ACTIVE' })).toBe(base);
+    expect(base.paginate({ page: 1, limit: 5 })).toBe(base);
   });
 });
 
@@ -414,15 +727,113 @@ describe('QueryBuilder extras', () => {
 
   it('select and include are mutually exclusive (select wins last)', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate)
-      .include({ posts: true })
+    await new QueryBuilder(delegate).include({ posts: true }).select({ id: true }).execute();
+    expect(recorded.findManyArgs?.select).toEqual({ id: true });
+    expect(recorded.findManyArgs?.include).toBeUndefined();
+  });
+
+  it('select() beats a seeded include: never both in one query', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate, { initialArgs: { include: { posts: true } } })
       .select({ id: true })
       .execute();
     expect(recorded.findManyArgs?.select).toEqual({ id: true });
     expect(recorded.findManyArgs?.include).toBeUndefined();
   });
 
-  it('paginate().first() returns the global first row (audit G5 semantics)', async () => {
+  it('include() beats a seeded select: never both in one query', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate, { initialArgs: { select: { id: true } } })
+      .include({ posts: true })
+      .execute();
+    expect(recorded.findManyArgs?.include).toEqual({ posts: true });
+    expect(recorded.findManyArgs?.select).toBeUndefined();
+  });
+
+  it('explicit select() wins over custom() regardless of call order', async () => {
+    const a = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(a.delegate)
+      .select({ id: true })
+      .custom({ include: { posts: true }, select: { email: true } })
+      .execute();
+    const b = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(b.delegate)
+      .custom({ include: { posts: true }, select: { email: true } })
+      .select({ id: true })
+      .execute();
+    for (const { recorded } of [a, b]) {
+      expect(recorded.findManyArgs?.select).toEqual({ id: true });
+      expect(recorded.findManyArgs?.include).toBeUndefined();
+    }
+  });
+
+  it('custom select then custom include: only the select reaches the delegate', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate)
+      .custom({ select: { id: true } })
+      .custom({ include: { posts: true } })
+      .execute();
+    expect(recorded.findManyArgs?.select).toEqual({ id: true });
+    expect(recorded.findManyArgs?.include).toBeUndefined();
+  });
+
+  it('a custom() include is sent when nothing explicit was set', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate).custom({ include: { posts: true } }).execute();
+    expect(recorded.findManyArgs?.include).toEqual({ posts: true });
+    expect(recorded.findManyArgs?.select).toBeUndefined();
+  });
+
+  it('a seeded select feeds the cursor field guard', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    await expect(
+      new QueryBuilder(delegate, { initialArgs: { select: { email: true } } })
+        .cursorPaginate({ limit: 2 })
+        .executeWithCursor(),
+    ).rejects.toThrow('cursorField');
+  });
+
+  it('an explicit include() lifts a seeded select that would trip the cursor guard', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(3));
+    const result = await new QueryBuilder(delegate, {
+      initialArgs: { select: { email: true } },
+    })
+      .include({ posts: true })
+      .cursorPaginate({ limit: 2 })
+      .executeWithCursor();
+    expect(result.data).toHaveLength(2);
+  });
+
+  it('execute methods never change the builder: execute() after executeWithMeta() is unpaginated', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    const qb = new QueryBuilder(delegate);
+    await qb.executeWithMeta();
+    await qb.execute();
+    expect(recorded.findManyArgs?.take).toBeUndefined();
+    expect(recorded.findManyArgs?.skip).toBeUndefined();
+  });
+
+  it('executeWithCursor() does not switch the builder into cursor mode', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    const qb = new QueryBuilder(delegate);
+    await qb.executeWithCursor();
+    const { meta } = await qb.executeWithMeta();
+    expect(meta.page).toBe(1);
+    expect(recorded.findManyArgs?.take).toBe(10);
+    expect(recorded.findManyArgs?.skip).toBe(0);
+  });
+
+  it('executeWithCursor() falls back to the paginate() limit', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(60));
+    const { data, meta } = await new QueryBuilder(delegate)
+      .paginate({ limit: 25 })
+      .executeWithCursor();
+    expect(recorded.findManyArgs?.take).toBe(26);
+    expect(data).toHaveLength(25);
+    expect(meta.limit).toBe(25);
+  });
+
+  it('paginate().first() returns the global first row', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(20));
     const row = await new QueryBuilder(delegate).paginate({ page: 3, limit: 5 }).first();
     expect(recorded.findManyArgs?.take).toBe(1);

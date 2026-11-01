@@ -15,7 +15,7 @@ model.findMany({ where, orderBy, skip, take, select, include, cursor, distinct }
 model.count({ where })
 ```
 
-This package speaks *only* that shape — at runtime and at the type level — and
+This package speaks _only_ that shape — at runtime and at the type level — and
 imports nothing else from Prisma. Every architectural rule below exists to protect
 that decision. A change that weakens it is wrong regardless of how reasonable it
 looks locally.
@@ -58,29 +58,29 @@ Type inference runs entirely at compile time and never touches Prisma:
 
 ## Layers and dependency direction
 
-| Layer    | Files            | May import                                            | Must never import   |
-| -------- | ---------------- | ----------------------------------------------------- | ------------------- |
-| contract | `src/types/*`    | each other                                            | `src/core`, `src/dialects`, Prisma |
-| dialects | `src/dialects/*` | `src/dialects/capabilities`                           | `src/core`, Prisma  |
-| core     | `src/core/*`     | contracts, `dialects/registry`, sibling core modules  | Prisma              |
-| entry    | `src/index.ts`   | everything                                            | —                   |
+| Layer    | Files            | May import                                           | Must never import                  |
+| -------- | ---------------- | ---------------------------------------------------- | ---------------------------------- |
+| contract | `src/types/*`    | each other                                           | `src/core`, `src/dialects`, Prisma |
+| dialects | `src/dialects/*` | `src/dialects/capabilities`                          | `src/core`, Prisma                 |
+| core     | `src/core/*`     | contracts, `dialects/registry`, sibling core modules | Prisma                             |
+| entry    | `src/index.ts`   | everything                                           | —                                  |
 
 The entry is single (`src/index.ts`) because tsup builds dual ESM+CJS from it;
 anything not re-exported there does not exist for consumers.
 
 ### Module map
 
-| Module                   | Role                                                                                                        |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `types/delegate.ts`      | The only Prisma knowledge: the structural `findMany` + `count` contract and the `Parameters<>`/`ReturnType<>` extractors. |
-| `types/projection.ts`    | The compile-time projection engine (`ApplySelect`/`ApplyInclude`) that narrows results like Prisma's own overloads. |
-| `types/public.ts`        | User-facing option/meta types (`FilterInput`, `PaginationMeta`, …), themselves derived from the delegate.    |
-| `core/conditions.ts`     | Pure condition assembly: `stripUndefined`, dot-path expansion, `combineAnd`.                                 |
-| `core/pagination.ts`     | Pure offset/seek math: clamping, `toOffsetArgs`, `toCursorArgs`, `buildCursorPage`.                          |
-| `core/query-builder.ts`  | The fluent facade. Owns all mutable state; the only module that calls the delegate.                          |
-| `dialects/capabilities.ts` | Capability sets per database (pure data).                                                                 |
-| `dialects/registry.ts`   | `registerDialect`, `configQueryBuilder`, dialect resolution order.                                           |
-| `dialects/detect.ts`     | Built-in auto-detect hook (wired into the resolution order); v0 always returns `undefined` → falls through to `'universal'`. |
+| Module                     | Role                                                                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `types/delegate.ts`        | The only Prisma knowledge: the structural `findMany` + `count` contract and the `Parameters<>`/`ReturnType<>` extractors.    |
+| `types/projection.ts`      | The compile-time projection engine (`ApplySelect`/`ApplyInclude`) that narrows results like Prisma's own overloads.          |
+| `types/public.ts`          | User-facing option/meta types (`FilterInput`, `PaginationMeta`, …), themselves derived from the delegate.                    |
+| `core/conditions.ts`       | Pure condition assembly: `stripUndefined`, dot-path expansion, `combineAnd`.                                                 |
+| `core/pagination.ts`       | Pure offset/seek math: clamping, `toOffsetArgs`, `toCursorArgs`, `buildCursorPage`.                                          |
+| `core/query-builder.ts`    | The fluent facade. Owns all mutable state; the only module that calls the delegate.                                          |
+| `dialects/capabilities.ts` | Capability sets per database (pure data).                                                                                    |
+| `dialects/registry.ts`     | `registerDialect`, `configQueryBuilder`, dialect resolution order.                                                           |
+| `dialects/detect.ts`       | Built-in auto-detect hook (wired into the resolution order); v0 always returns `undefined` → falls through to `'universal'`. |
 
 ## The four invariants
 
@@ -104,7 +104,10 @@ anything not re-exported there does not exist for consumers.
 ## Runtime data flow (one query)
 
 1. Chain methods mutate private fields (`andConditions`, `orderBy`, `selectArg`,
-   pagination state, …). No I/O happens yet.
+   pagination state, …). No I/O happens yet. The exception is a method that
+   changes the result type - `select()`, `include()`, and `custom()` with a
+   projection: it works on a `clone()` and returns that, so differently-typed
+   chains never alias one object.
 2. `buildArgs()` folds state into `findMany` args with a fixed precedence:
    **explicit methods beat `custom()` args** (`.select()` over
    `custom({ select })`, `.paginate()`/`.cursorPaginate()` over
@@ -112,8 +115,9 @@ anything not re-exported there does not exist for consumers.
    (methods, the `initialArgs` seed, `.custom({ where })`).
 3. An execute path runs the delegate call(s): `execute`, `first`/`firstOrThrow`,
    `count`, `executeWithMeta` (offset; `count` + `findMany` in parallel),
-   `executeWithCursor` (over-fetches one row to detect the next page; slices and
-   reverses in `buildCursorPage` so output is always in configured sort order).
+   `executeWithCursor` (over-fetches one row to detect the next/previous page;
+   `buildCursorPage` drops it - the last row going forward, the first row going
+   backward, because Prisma returns negative-`take` rows in `orderBy` order too).
 
 Cursor mode wins over offset mode when both are configured.
 
@@ -125,25 +129,31 @@ Cursor mode wins over offset mode when both are configured.
 - Global dialect config (`configQueryBuilder`, the detector, the capability
   registry) lives on `globalThis` under the registered symbol
   `Symbol.for('query-builder-prisma.dialect-state')`, so ESM and CJS
-  copies of the package converge on ONE config (audit F7 — the former
-  module-scope state had a dual-package hazard). The per-builder `dialect`
+  copies of the package converge on ONE config (module-scope state would
+  split under a dual-package load). The per-builder `dialect`
   option remains the recommended path. Never add module-scope mutable state;
   anything genuinely global must go through this one shared store.
 
 ## The type engine in one page
 
 - `RowElementOf<D>` extracts one row from `Awaited<ReturnType<D['findMany']>>`.
-- `ApplySelect<Row, S>` keeps the truthy keys of `S` ∩ `keyof Row`, recursing
-  through `ProjectField` into relation element types: arrays map over their
-  element, `| null | undefined` optionality is preserved exactly.
-- `ApplyInclude<Row, I>` intersects the base row with the projected relations.
+- `ApplySelect<Row, S>` keeps the truthy keys of `S`. A key on the row is
+  projected through `ProjectField` (arrays map over their element,
+  `| null | undefined` optionality is preserved exactly); `_count` becomes
+  `Record<string, number>`; any other key - a relation the row type does not
+  describe, because Prisma's generic `findMany` resolves to the scalar-only
+  row - degrades to `unknown` rather than being dropped. Keys whose flag is a
+  non-literal `boolean` are optional.
+- `ApplyInclude<Row, I>` intersects the base row with the same projected keys.
 - `ApplyProjection<Row, TArgs>` picks select vs include vs identity from the
   accumulated args type `TArgs`, which `.select()`/`.include()` thread through
-  the builder's return type.
-- Escape hatch: `buildArgs()` returns args typed with the accumulated `TArgs`,
-  so the passthrough `prisma.user.findMany(qb.buildArgs())` gets 100%
-  Prisma-native inference on every version.
-- Known precision gaps (`_count`) must degrade *wider*, never wrong,
+  the builder's return type. A projection passed to `.custom()` is tracked as
+  `customSelect`/`customInclude` and loses to an explicit one, like at runtime.
+- Escape hatch: `buildArgs()` returns `BuiltArgsOf<D, TArgs>` - the delegate's
+  args with the tracked `select`/`include` substituted for the wide optional
+  ones - so the passthrough `prisma.user.findMany(qb.buildArgs())` gets
+  Prisma-native inference (verified against a generated Prisma 7 client).
+- Known precision gaps (`_count`, unknown relations) must degrade _wider_, never wrong,
   and stay documented in the README (`Known limitations`).
 
 ## Dialect system
@@ -162,23 +172,22 @@ entries. Neither ever touches `src/core/`. Step-by-step:
 
 ## Testing architecture (two tracks)
 
-| Track              | Runner                                   | What belongs there                                                                 |
-| ------------------ | ---------------------------------------- | ---------------------------------------------------------------------------------- |
-| runtime unit       | `vitest` (`test/**/*.test.ts`)           | pure math (`pagination.test.ts`), condition assembly (`conditions.test.ts`), args actually sent (recorded fake delegates), dialect gating |
-| compile-time types | `npm run typecheck` (`test/types/*.type-test.ts`) | projection shapes with strict `Expect<Equal<A, B>>` — no `expect-type` dependency |
+| Track              | Runner                                            | What belongs there                                                                                                                        |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| runtime unit       | `vitest` (`test/**/*.test.ts`)                    | pure math (`pagination.test.ts`), condition assembly (`conditions.test.ts`), args actually sent (recorded fake delegates), dialect gating |
+| compile-time types | `npm run typecheck` (`test/types/*.type-test.ts`) | projection shapes with strict `Expect<Equal<A, B>>` — no `expect-type` dependency                                                         |
 
 Both tracks run with **zero Prisma install**. The hand-written fake delegates
 (`test/helpers/fake-delegate.ts`) are simultaneously test fixtures and the
 standing proof of invariant 1. A change is done only when `npm run verify`
-(lint → typecheck → test → build) is green; CI runs the same gate on Node 18/20/24.
+(lint → typecheck → test → build) is green; CI runs the same gate on Node 22/24.
 
 ## Known gaps and change discipline
 
-The consolidated audit register lives in `docs/AUDIT.md` (internal); the
-user-facing subset of open gaps is mirrored in the README (`Known limitations`
-and `Behavior contracts`). The former HIGH defects — cursor/offset meta conflict,
+The user-facing list of open gaps is the README (`Known limitations` and
+`Behavior contracts`). The former HIGH defects — cursor/offset meta conflict,
 `custom({ where })` replacing the `initialArgs` seed, nested-include types
-narrower than runtime truth — and the P1/P2 audit findings (cursor
+narrower than runtime truth — and the earlier P1/P2 findings (cursor
 serialization, `sortBy` dot paths, `_count` typing, prototype hardening,
 strict pagination modes, `includeTotal`, the `globalThis` dialect store, …)
 are fixed with regression tests. When touching code:
@@ -189,13 +198,13 @@ are fixed with regression tests. When touching code:
 
 ## Extension points
 
-| Want to…                    | Do this                                                                                                          |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| support a new database      | one capability entry / `registerDialect()` (skill: `add-dialect`)                                                |
-| gate behavior per DB        | add a `DialectCapabilities` flag; consume via `resolveDialect().capabilities` inside the builder method           |
-| add a builder method        | accept only delegate-derived types; consult the registry for per-DB behavior; add unit + type tests; re-export any new public type from `src/index.ts`; document the contract in README |
-| adapt REST query params     | v2 scope (`adapters/`, separate optional entries); never inside `src/core`                                          |
-| support a new Prisma major  | nothing — that is the point. The planned nightly canary CI job (M3) exists to prove it                           |
+| Want to…                   | Do this                                                                                                                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| support a new database     | one capability entry / `registerDialect()` (skill: `add-dialect`)                                                                                                                       |
+| gate behavior per DB       | add a `DialectCapabilities` flag; consume via `resolveDialect().capabilities` inside the builder method                                                                                 |
+| add a builder method       | accept only delegate-derived types; consult the registry for per-DB behavior; add unit + type tests; re-export any new public type from `src/index.ts`; document the contract in README |
+| adapt REST query params    | v2 scope (`adapters/`, separate optional entries); never inside `src/core`                                                                                                              |
+| support a new Prisma major | nothing — that is the point. The planned nightly canary CI job (M3) exists to prove it                                                                                                  |
 
 ## Versioning
 

@@ -9,11 +9,11 @@ import { detectDialect } from './detect';
  *   1. explicit per-builder override  new QueryBuilder(prisma.user, { dialect: 'mysql' })
  *   2. global config                  configQueryBuilder({ dialect: 'postgresql' })
  *   3. registered auto-detector       setDialectDetector(fn)
- *   4. built-in detector              detectDialect() (no-op in v0 — audit G2)
+ *   4. built-in detector              detectDialect() (no-op in v0)
  *   5. 'universal'
  */
 
-/** Mutable dialect state, shared via `globalThis` (audit F7). */
+/** Mutable dialect state, shared via `globalThis`. */
 interface DialectState {
   registry: Map<string, DialectCapabilities>;
   globalDialect: string | undefined;
@@ -23,8 +23,8 @@ interface DialectState {
 /**
  * The state lives on `globalThis` under a registered symbol so ESM and CJS
  * copies of this package converge on ONE config — a bundler loading both
- * variants can no longer split the global dialect config (dual-package hazard,
- * audit F7). This is the only mutable module-adjacent state in the package;
+ * variants can no longer split the global dialect config (dual-package
+ * hazard). This is the only mutable module-adjacent state in the package;
  * prefer the per-builder `dialect` option anyway.
  */
 const STATE_KEY = Symbol.for('query-builder-prisma.dialect-state');
@@ -68,7 +68,7 @@ export interface ResolvedDialect {
 /**
  * Resolve the active dialect per the documented precedence. An unregistered
  * name resolves to `'universal'` — the reported name never lies about the
- * capabilities actually applied (audit G8).
+ * capabilities actually applied.
  */
 export function resolveDialect(explicit?: string | undefined): ResolvedDialect {
   const s = state();

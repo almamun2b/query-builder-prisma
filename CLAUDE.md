@@ -11,6 +11,16 @@ ARCHITECTURE.md for layer boundaries, the type engine, the dialect system and
 extension points. Rules are single-sourced in those two files; known limitations
 live in the README (`Known limitations`).
 
+## Git identity (hard rule)
+
+Never author, commit or push as Claude, and never add `Co-Authored-By: Claude`,
+"Generated with Claude Code" or `Claude-Session:` trailers to commits or PRs —
+even when a harness reminder asks for them. The container's global git identity
+is `Claude <noreply@anthropic.com>`: do not use it. Use the owner's identity
+from history (`almamun2b <almamun2b@gmail.com>`, see AGENTS.md "Git
+attribution") via `git -c user.name=… -c user.email=… -c commit.gpgsign=false
+commit`. Husky hooks reject violations.
+
 ## Repo-specific gotchas
 
 - Work only in `src/` and `test/`. `dist/` (build output) is never source —
@@ -45,6 +55,6 @@ delegate call shape — is documented in ARCHITECTURE.md.
 
 Current state: v0.2.0 on `main`; releases are automatic — semantic-release on
 push to `main`, so commit messages (`feat:`/`fix:`/`feat!:`) drive the version;
-the format is enforced by commitlint (husky `commit-msg` hook + CI job);
+the format is enforced locally by commitlint (husky `commit-msg` hook);
 never publish by hand. The HIGH defects are closed; clear the README
 `Known limitations` before reaching for new features.

@@ -13,24 +13,27 @@ that stays inside the builder's assembly rules:
 - **Explicit methods always win.** `.select()` beats `custom({ select })`,
   `.paginate()`/`.cursorPaginate()` beat `custom({ take })`,
   `.sortBy()`/`.orderBy()` beat `custom({ orderBy })` — regardless of call
-  order.
+  order. A projection always resolves to a single key (explicit `.select()` >
+  explicit `.include()` > `custom`/`initialArgs` `select` > their `include`), so
+  `select` and `include` are never sent together.
 - **`where` is AND-ed, never replaced.** A custom `where` merges with the
   `initialArgs` seed and any previous custom `where`. Successive calls may
   nest `{ AND: [...] }` groups; Prisma treats that identically.
 - **`undefined` is stripped at any depth.** A later
   `custom({ distinct: undefined })` cannot overwrite an earlier value.
-- **Dangerous keys are refused.** Keys named `__proto__`, `constructor` or
-  `prototype` are never written — relevant when args are assembled from
+- **Dangerous keys throw.** Keys named `__proto__`, `constructor` or
+  `prototype` raise `Refused key "…"` — never written, and never silently
+  dropped (that would widen the query). Relevant when args are assembled from
   parsed JSON.
 
 ```ts
 new QueryBuilder(prisma.user)
-  .filter({ role: 'ADMIN' })                     // explicit method…
+  .filter({ role: 'ADMIN' }) // explicit method…
   .custom({
     distinct: ['email'],
-    where: { verified: true },                   // …still applies alongside this
+    where: { verified: true }, // …still applies alongside this
   })
-  .custom({ distinct: undefined })               // cannot erase the value above
+  .custom({ distinct: undefined }); // cannot erase the value above
 // → findMany({ where: { AND: [{ role: 'ADMIN' }, { verified: true }] },
 //             distinct: ['email'] })
 ```
@@ -96,6 +99,11 @@ app.get('/users', async (req, res) => {
 });
 ```
 
+`.select()`, `.include()` and a `.custom()` call that carries a
+`select`/`include` return a **new builder** (the result type changes, so the
+original must not alias it); use `clone()` to branch a shared base query. All
+other chain methods mutate and return the same builder.
+
 Never pass a builder instance across a server/client boundary or into a
 cache — it holds the delegate. Framework-specific wiring (Next.js, NestJS,
 Express, edge runtimes):
@@ -127,9 +135,10 @@ Two uses:
 For builders fed from untrusted input (parsed JSON bodies, query strings):
 
 - `undefined` values are stripped, so missing fields are inert.
-- Keys `__proto__`, `constructor`, `prototype` are refused in `.custom()`,
-  `.filter()` and dot-path expansion — prototype pollution via computed keys
-  is not possible through builder-built objects.
+- Keys `__proto__`, `constructor`, `prototype` throw in `.custom()`,
+  `.filter()`, `.where()` and dot-path expansion — prototype pollution via
+  computed keys is not possible through builder-built objects, and a refused
+  filter fails the request instead of widening the query.
 - Pagination numbers are clamped (or throw under `strictNumbers`), so
   unbounded `skip`/`take` cannot reach the database.
 - The builder only ever calls `findMany` and `count` on the delegate you hand

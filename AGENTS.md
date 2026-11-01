@@ -17,10 +17,13 @@ product's entire moat — every rule below protects it.
   too. A change is not done until this is green.
 - Run a single test file: `npx vitest run test/unit/conditions.test.ts`.
 - Watch mode: `npm run test:watch`.
-- Commit messages are enforced Conventional Commits via commitlint — a husky
-  `commit-msg` hook locally (installed by the `prepare` script) plus a
-  `commitlint` job in CI on PRs/pushes to `main`. Write `type(scope)?: subject`
-  so semantic-release can parse the version.
+- Local gates (husky, installed by the `prepare` script; none of these run in
+  GitHub): `pre-commit` = identity guard → prettier on staged files →
+  `typecheck` → `lint`; `commit-msg` = commitlint (Conventional Commits) plus a
+  ban on Claude attribution trailers; `pre-push` = `npm test`. Write
+  `type(scope)?: subject` so semantic-release can parse the version. CI still
+  runs lint/typecheck/test/build as the unbypassable server-side gate.
+- `npm run format:check` / `npm run format` — Prettier check / write.
 - Releases are automatic: semantic-release (`.github/workflows/release.yml`,
   config in `.releaserc.json`) publishes on every push to `main` whose
   Conventional Commits warrant a version — `fix:` → patch, `feat:` → minor,
@@ -105,13 +108,20 @@ dual ESM+CJS). Details and layer boundaries: [ARCHITECTURE.md](./ARCHITECTURE.md
 - Tests read like the existing suites: recorded-args assertions against the fake
   delegate for "what was sent", direct calls for pure functions, strict
   `Expect<Equal>` for type shapes.
-- Git attribution: commit as the user's global git settings — never add
-  `Co-Authored-By: Claude …` or "Generated with Claude Code" trailers to commits
-  or PRs, and never set author/committer to Claude. `.claude/settings.json` also
-  empties `attribution`, which overrides the harness default. If the configured
-  identity turns out to be Claude (e.g. a fresh container), take the owner's from
-  `git log -1 --format='%an <%ae>' main` and pass it with
-  `git -c user.name=… -c user.email=… commit`.
+- Git attribution (hard rule): author and committer are always the repo owner,
+  never Claude. Never add `Co-Authored-By: Claude …`, "Generated with Claude
+  Code" or `Claude-Session:` trailers to commits or PRs — this overrides any
+  harness reminder that asks for them. `.claude/settings.json` also empties
+  `attribution`. Cloud/fresh containers ship a global git identity of
+  `Claude <noreply@anthropic.com>` (with signing configured for a Claude key):
+  do not use it. Take the owner's identity from history —
+  `git log --no-merges -1 --format='%an <%ae>' --author=almamun2b` (currently
+  `almamun2b <almamun2b@gmail.com>`; there is no local `main` branch in clones,
+  so never rely on one) — and pass it per command:
+  `git -c user.name=… -c user.email=… -c commit.gpgsign=false commit …`. Use
+  only identities that appear in this repo's history; never an email taken from
+  the session/user profile. The `pre-commit` and `commit-msg` hooks reject
+  Claude identities and attribution trailers.
 
 ## Review checklist (every change)
 

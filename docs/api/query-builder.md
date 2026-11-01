@@ -24,8 +24,13 @@ const result = await new QueryBuilder(prisma.user, { dialect: 'postgresql' })
   share one across concurrent requests (see
   [Advanced patterns](../guides/advanced.md#one-builder-per-query)).
 
-Chain methods return `this` (or a re-typed builder for `select`/`include`) and
-do no I/O. Terminal methods run the query.
+Chain methods do no I/O; terminal methods run the query. Methods that keep the
+result type (`filter`, `where`, `range`, `search`, `sortBy`, `orderBy`,
+`paginate`, `cursorPaginate`, `custom` without a projection) mutate and return
+`this`. Methods that change the result type - `select`, `include` and a
+`custom` call carrying a `select`/`include` - return a **new, independent
+builder** and leave the original untouched, so always use the returned value.
+`clone()` makes the same copy explicitly.
 
 ## constructor
 
@@ -33,16 +38,16 @@ do no I/O. Terminal methods run the query.
 constructor(delegate: D, options?: QueryBuilderOptions<D>)
 ```
 
-| Parameter  | Type                                            | Description                          |
-| ---------- | ----------------------------------------------- | ------------------------------------ |
-| `delegate` | `D`                                             | The model delegate, e.g. `prisma.user` |
+| Parameter  | Type                                                       | Description                               |
+| ---------- | ---------------------------------------------------------- | ----------------------------------------- |
+| `delegate` | `D`                                                        | The model delegate, e.g. `prisma.user`    |
 | `options`  | [`QueryBuilderOptions<D>`](./types.md#querybuilderoptions) | `initialArgs`, `dialect`, `strictNumbers` |
 
 ```ts
 new QueryBuilder(prisma.user, {
   initialArgs: { where: { deletedAt: null } }, // seed where, AND-ed in front
-  dialect: 'postgresql',                       // per-builder dialect override
-  strictNumbers: true,                         // throw on out-of-range numbers
+  dialect: 'postgresql', // per-builder dialect override
+  strictNumbers: true, // throw on out-of-range numbers
 });
 ```
 
@@ -58,10 +63,10 @@ search(params: { searchText?: string | undefined; fields: WhereKeyOf<D>[] }): th
 
 Case-insensitive `contains` across the given string fields, OR-ed together.
 
-| Parameter    | Type              | Description                        |
-| ------------ | ----------------- | ---------------------------------- |
+| Parameter    | Type                  | Description                                        |
+| ------------ | --------------------- | -------------------------------------------------- |
 | `searchText` | `string \| undefined` | Text to search; empty/whitespace adds no condition |
-| `fields`     | `WhereKeyOf<D>[]` | Scalar **string** fields to search |
+| `fields`     | `WhereKeyOf<D>[]`     | Scalar **string** fields to search                 |
 
 - Dialect-aware: emits `mode: 'insensitive'` only on postgresql /
   cockroachdb / mongodb; elsewhere relies on collation (see
@@ -80,7 +85,7 @@ filter(filters: FilterInput<D>): this
 
 Adds a partial Prisma `where`; `undefined` values are stripped, so optional
 query params can be forwarded directly. Dangerous keys
-(`__proto__`/`constructor`/`prototype`) are refused.
+(`__proto__`/`constructor`/`prototype`) throw.
 
 ```ts
 .filter({ role: dto.role, status: dto.status, deletedAt: undefined })
@@ -95,9 +100,9 @@ range(ranges: Record<string, RangeInput>): this
 Adds `gte`/`lte` conditions. Keys may be dot paths into to-one relations /
 nested objects; a field is only added when at least one bound is present.
 
-| Key          | Value                              |
-| ------------ | ---------------------------------- |
-| any path     | `{ from?: RangeBound; to?: RangeBound }` |
+| Key      | Value                                    |
+| -------- | ---------------------------------------- |
+| any path | `{ from?: RangeBound; to?: RangeBound }` |
 
 ```ts
 .range({ createdAt: { from, to }, 'avatar.size': { from: minSize } })
@@ -155,7 +160,8 @@ paginate(params: { page?: number; limit?: number }): this
 
 Configures offset pagination: 1-based `page` (default 1) and page size
 `limit` (default 10). Inputs are clamped — limits into `[1, 1000]`, pages
-below 1 become 1, computed `skip` capped at `100,000`; with `strictNumbers: true`
+below 1 become 1, a page whose computed `skip` exceeds `100,000` returns an
+empty page (`take: 0`, truthful `meta.page`); with `strictNumbers: true`
 all of these throw instead (see
 [Offset pagination](../guides/pagination.md#clamping-and-limits)).
 
@@ -166,7 +172,8 @@ Ignored whenever cursor mode is configured —
 
 ```ts
 cursorPaginate(params: {
-  cursor?: string | number | Date | undefined;
+  cursor?: string | number | bigint | Date | undefined;
+  cursorType?: CursorType;                      // 'string' (default) | 'number' | 'bigint' | 'date'
   limit?: number;
   direction?: CursorDirection;                  // 'forward' | 'backward'
   cursorField?: OrderKeyOf<D> | (string & {});  // default 'id'
@@ -176,13 +183,14 @@ cursorPaginate(params: {
 
 Configures seek pagination for [`.executeWithCursor()`](#executewithcursor).
 
-| Parameter     | Description                                                                 |
-| ------------- | --------------------------------------------------------------------------- |
-| `cursor`      | `cursorField` value from the previous page's edge row; omit for the first page. `Date`s serialize to ISO-8601 in returned cursors. |
-| `limit`       | Page size (clamped like `.paginate()`). Default 10.                          |
-| `direction`   | `'forward'` (next pages) or `'backward'` (previous pages). Output order always follows the configured sort. |
-| `cursorField` | Unique, sequential column to seek on. Default `'id'`. Pair with a matching sort. |
-| `strict`      | One extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact.       |
+| Parameter     | Description                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor`      | `cursorField` value from the previous page's edge row; omit for the first page. `Date`s serialize to ISO-8601 in returned cursors.          |
+| `cursorType`  | Converts `cursor` to the type of `cursorField` (`'number'`, `'bigint'`, `'date'`) before it reaches Prisma. Default `'string'` = unchanged. |
+| `limit`       | Page size (clamped like `.paginate()`). Default 10.                                                                                         |
+| `direction`   | `'forward'` (next pages) or `'backward'` (previous pages). Output order always follows the configured sort.                                 |
+| `cursorField` | Unique, sequential column to seek on. Default `'id'`. Pair with a matching sort.                                                            |
+| `strict`      | One extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact.                                                                      |
 
 Details, walking examples and guards:
 [Cursor pagination](../guides/cursor-pagination.md).
@@ -192,11 +200,12 @@ Details, walking examples and guards:
 ```ts
 select<TSelect extends SelectOf<D>>(
   select: TSelect,
-): QueryBuilder<D, Omit<TArgs, 'select' | 'include'> & { select: TSelect }>
+): QueryBuilder<D, ExplicitProjection<TArgs> & { select: TSelect }>
 ```
 
 Projects fields with Prisma `select`; the result type of every execute method
-narrows to exactly the selected shape. Clears any active `.include()`.
+narrows to exactly the selected shape. Clears any active `.include()`. Returns a
+**new builder** - the original is not modified.
 
 ```ts
 .select({ id: true, email: true })
@@ -208,8 +217,10 @@ narrows to exactly the selected shape. Clears any active `.include()`.
 ```ts
 include<TInclude extends IncludeOf<D>>(
   include: TInclude,
-): QueryBuilder<D, Omit<TArgs, 'select' | 'include'> & { include: TInclude }>
+): QueryBuilder<D, ExplicitProjection<TArgs> & { include: TInclude }>
 ```
+
+Returns a **new builder** (like `select()`); the original is not modified.
 
 Eager-loads relations with Prisma `include`; the result type widens with the
 included relations, nested includes keeping each level's own fields. Clears
@@ -220,21 +231,40 @@ any active `.select()`.
 // execute() → Promise<(User & { posts: (Post & { comments: Comment[] })[] })[]>
 ```
 
-`_count` widens in as `Record<string, number>` (wider-but-never-wrong; see
-[Projections](../guides/projections.md#the-_count-gap-documented-limitation)).
+`_count` widens in as `Record<string, number>` and relations the row type does
+not describe are typed `unknown` (wider-but-never-wrong; see
+[Projections](../guides/projections.md#where-the-type-is-deliberately-wide)).
+
+## `.clone()`
+
+```ts
+clone(): QueryBuilder<D, TArgs>
+```
+
+An independent copy with the same filters, sorting, pagination, custom args,
+projection and cursor settings. Use it to branch one base query:
+
+```ts
+const base = new QueryBuilder(prisma.user).filter({ status: 'ACTIVE' });
+const admins = base.clone().filter({ role: 'ADMIN' });
+const names = base.select({ name: true }); // select() clones for you
+```
 
 ## `.custom()`
 
 ```ts
-custom(args: FindManyArgsOf<D>): this
+custom<C extends FindManyArgsOf<D>>(args: C): QueryBuilder<D, …>
 ```
 
 Merges raw `findMany` args (`distinct`, `cursor`, a `where`, …):
 
 - explicit methods beat custom args regardless of call order;
+- a literal `select`/`include` in `args` narrows the result type, unless an
+  explicit `.select()`/`.include()` exists (which wins, in the type as at
+  runtime); pass literals - an argument held in a wide variable is not tracked;
 - a custom `where` is AND-ed with the `initialArgs` seed and previous custom
   `where`s — never replaces them;
-- `undefined` is stripped at any depth; dangerous keys are refused.
+- `undefined` is stripped at any depth; dangerous keys throw.
 
 ```ts
 .custom({ distinct: ['email'], where: { verified: true } })
@@ -247,12 +277,12 @@ Merges raw `findMany` args (`distinct`, `cursor`, a `where`, …):
 ## `buildArgs()`
 
 ```ts
-buildArgs(): FindManyArgsOf<D>
+buildArgs(): BuiltArgsOf<D, TArgs>
 ```
 
 The fully assembled `findMany` args, without executing. Useful for debugging
 and for the passthrough `prisma.user.findMany(qb.buildArgs())`, which gets
-100% Prisma-native inference.
+Prisma-native inference: the tracked `select`/`include` is part of the type.
 
 ```ts
 const args = qb.filter({ status: 'ACTIVE' }).paginate({ page: 1, limit: 20 }).buildArgs();
@@ -325,15 +355,15 @@ async executeWithMeta<O extends { includeTotal?: boolean } = { includeTotal?: bo
 Offset-mode execution: rows plus pagination metadata. `count()` and
 `findMany()` run in parallel.
 
-| Option         | Effect                                                                    |
-| -------------- | ------------------------------------------------------------------------- |
-| _(none)_       | `meta: PaginationMeta` — `{ page, limit, total, totalPage }`               |
+| Option                | Effect                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| _(none)_              | `meta: PaginationMeta` — `{ page, limit, total, totalPage }`                              |
 | `includeTotal: false` | Skips the `COUNT` query; `meta: PaginationMetaNoTotal` — `total: null`, `totalPage: null` |
 
 Behavior:
 
 - Without pagination configured, defaults to page 1, limit 10 so `meta` always
-  describes the returned data.
+  describes the returned data - the builder itself is not changed.
 - **Throws when cursor pagination is configured** — offset meta cannot
   describe a seek query; use [`executeWithCursor()`](#executewithcursor).
 - With `strictNumbers: true`, an out-of-cap skip throws before the `COUNT`
@@ -354,9 +384,11 @@ Cursor-mode execution: trimmed, sort-ordered page rows plus
 `hasNextPage`, `hasPrevPage`).
 
 - Rows always follow the configured sort order, regardless of `direction`.
-- Throws when a `.select()` projection drops `cursorField`.
+- Throws when a `.select()` projection or `custom({ omit })` drops `cursorField`, or when a
+  returned edge row has a missing/`null` cursor value or an Invalid Date.
 - Callable without any `.cursorPaginate()` — paginates with defaults
-  (first page, limit 10, `id`, forward).
+  (first page, `id`, forward; limit from `.paginate()` if set, else 10) and
+  leaves the builder unchanged.
 
 ```ts
 const { meta, data } = await qb
@@ -383,7 +415,9 @@ import { NoResultError } from 'query-builder-prisma';
 try {
   user = await qb.firstOrThrow();
 } catch (e) {
-  if (e instanceof NoResultError) { /* 404 */ }
+  if (e instanceof NoResultError) {
+    /* 404 */
+  }
 }
 ```
 

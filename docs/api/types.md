@@ -72,6 +72,17 @@ Direction to walk through a cursor-paginated result set.
 type CursorDirection = 'forward' | 'backward';
 ```
 
+### `CursorType` / `CursorValue`
+
+How an incoming `cursor` is converted before it reaches Prisma, and the values
+`cursorPaginate()` accepts. The default `'string'` passes the cursor through
+unchanged.
+
+```ts
+type CursorType = 'string' | 'number' | 'bigint' | 'date';
+type CursorValue = string | number | bigint | Date;
+```
+
 ## Pagination metadata
 
 ### `PaginationMeta`
@@ -140,8 +151,14 @@ Names of the built-in dialects — the keys of
 
 ```ts
 type Dialect =
-  | 'postgresql' | 'cockroachdb' | 'mysql' | 'mariadb'
-  | 'sqlite' | 'sqlserver' | 'mongodb' | 'universal';
+  | 'postgresql'
+  | 'cockroachdb'
+  | 'mysql'
+  | 'mariadb'
+  | 'sqlite'
+  | 'sqlserver'
+  | 'mongodb'
+  | 'universal';
 ```
 
 ### `ResolvedDialect`
@@ -213,7 +230,9 @@ The model's `orderBy` input, and the single keys it accepts.
 type OrderByOf<D extends PrismaModelDelegate> = NonNullable<FindManyArgsOf<D>['orderBy']>;
 type OrderKeyOf<D extends PrismaModelDelegate> =
   OrderByOf<D> extends infer O
-    ? O extends readonly unknown[] ? keyof O[number] & string : keyof O & string
+    ? O extends readonly unknown[]
+      ? keyof O[number] & string
+      : keyof O & string
     : never;
 ```
 
@@ -223,30 +242,42 @@ The rows array `findMany` resolves to, and a single row of it.
 
 ```ts
 type RowsOf<D extends PrismaModelDelegate> = Awaited<ReturnType<D['findMany']>>;
-type RowElementOf<D extends PrismaModelDelegate> = RowsOf<D> extends readonly (infer E)[] ? E : never;
+type RowElementOf<D extends PrismaModelDelegate> =
+  RowsOf<D> extends readonly (infer E)[] ? E : never;
 ```
 
 ## Projection engine
 
 The compile-time engine that narrows results like Prisma's own overloads
 (see [Projections](../guides/projections.md)). Degradation rule: when Prisma's
-exact semantics can't be mirrored, the result is the *wider but correct* type.
+exact semantics can't be mirrored, the result is the _wider but correct_ type.
 
 ### `ApplySelect`
 
 Applies a `select` spec to a row: only selected fields remain, nested selects
-recurse into relation element types.
+recurse into relation element types. `_count` widens in as
+`Record<string, number>`, a key the row type does not describe is typed
+`unknown`, and a non-literal `boolean` flag makes its key optional.
 
 ### `ApplyInclude`
 
 Applies an `include` spec: the base row is kept and included relations are
 projected (recursively for nested includes; a truthy `_count` widens in as
-`Record<string, number>`).
+`Record<string, number>`, unknown relations are typed `unknown`).
 
 ### `ApplyProjection`
 
 Picks select vs include vs identity from the accumulated args type — the
-engine behind every execute method's return type.
+engine behind every execute method's return type. Explicit `select`/`include`
+beat a projection that arrived through `custom()`.
+
+### `ProjectionArgs` / `BuiltArgsOf`
+
+`ProjectionArgs<TArgs>` is the `select`/`include` part of the accumulated args.
+`BuiltArgsOf<D, TArgs>` is the return type of `buildArgs()`: the delegate's own
+`findMany` args with the tracked projection substituted for the wide optional
+`select`/`include`, which is what lets Prisma's `findMany` infer the exact
+native result for the passthrough.
 
 ### `FindResultOf`
 

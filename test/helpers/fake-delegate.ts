@@ -5,15 +5,17 @@ import type { PrismaModelDelegate } from '../../src/types/delegate';
  * satisfies the builder, any real Prisma delegate (any version) will too.
  */
 export interface FakeRow {
-  id: string;
+  id: string | number | bigint;
   email: string;
   status: string;
+  createdAt?: Date;
 }
 
 export interface FakeFindArgs {
   where?: Record<string, unknown>;
   select?: Record<string, boolean | object>;
   include?: Record<string, boolean | object>;
+  omit?: Record<string, boolean>;
   orderBy?: Record<string, 'asc' | 'desc'> | Record<string, 'asc' | 'desc'>[];
   skip?: number;
   take?: number;
@@ -23,29 +25,39 @@ export interface FakeFindArgs {
 
 export interface RecordedArgs {
   findManyArgs?: FakeFindArgs;
-  /** Every `findMany` call in order — strict cursor mode issues a probe call (audit F10). */
+  /** Every `findMany` call in order — strict cursor mode issues a probe call. */
   findManyCalls: (FakeFindArgs | undefined)[];
   countArgs?: Record<string, unknown>;
 }
 
-/** Build n deterministic fake rows. */
-export function fakeRows(n: number): FakeRow[] {
+/**
+ * Build n deterministic fake rows. `idType` picks the id column type: `'string'` (`u0`, `u1`, ...),
+ * `'number'` (1..n, like an `Int` autoincrement id) or `'bigint'` (1n..nn).
+ */
+export function fakeRows(n: number, idType: 'string' | 'number' | 'bigint' = 'string'): FakeRow[] {
   return Array.from({ length: n }, (_, i) => ({
-    id: `u${i}`,
+    id: idType === 'string' ? `u${i}` : idType === 'number' ? i + 1 : BigInt(i + 1),
     email: `e${i}@x.dev`,
     status: 'ACTIVE',
   }));
 }
 
 /**
- * Cursor-cell match with Prisma's DateTime coercion: ISO strings are accepted
- * for Date cells (this is what makes serialized cursors round-trippable — the
- * exact property audit F4 guarantees).
+ * Cursor-cell match with Prisma's DateTime coercion: ISO strings and Dates are accepted for Date
+ * cells (this is what makes serialized cursors round-trippable). Like Prisma's validation, any
+ * other cursor whose type does not match the column throws - a string `'5'` for an `Int` column is
+ * rejected ("Expected Int, provided String"), it does not silently match.
  */
 function matchesCursorCell(row: FakeRow, field: string, value: unknown): boolean {
   const cell: unknown = (row as unknown as Record<string, unknown>)[field];
   if (cell instanceof Date) {
-    return cell.toISOString() === String(value);
+    const wanted = value instanceof Date ? value.toISOString() : String(value);
+    return cell.toISOString() === wanted;
+  }
+  if (typeof cell !== typeof value) {
+    throw new Error(
+      `Argument \`${field}\`: Invalid value provided. Expected ${typeof cell}, provided ${typeof value}.`,
+    );
   }
   return cell === value;
 }
@@ -68,8 +80,9 @@ export function createFakeDelegate(rows: FakeRow[] = []): {
 
       // Emulate Prisma cursor semantics: the cursor anchors AT the matching
       // row, `skip: 1` excludes the cursor row, positive take walks forward,
-      // negative take walks backward (nearest first, returned in seek order —
-      // the builder re-reverses backward pages itself).
+      // negative take walks backward. Verified against a real Prisma client: the
+      // rows come back in `orderBy` order (NOT reversed), so the nearest row to the
+      // cursor is LAST and the farthest - the over-fetch row - is first.
       const cursorArg = args?.cursor;
       const firstCursor = cursorArg ? Object.entries(cursorArg)[0] : undefined;
       if (firstCursor !== undefined) {
@@ -79,18 +92,18 @@ export function createFakeDelegate(rows: FakeRow[] = []): {
           return [];
         }
         if (take !== undefined && take < 0) {
-          return rows.slice(0, anchor).reverse().slice(0, Math.abs(take));
+          return rows.slice(0, anchor).slice(-Math.abs(take));
         }
         const after = rows.slice(anchor + Math.max(skip, 1));
         return take !== undefined ? after.slice(0, take) : after;
       }
 
       // Emulate Prisma: apply skip, then take; negative take returns the last
-      // rows in reversed (seek) order.
+      // rows, still in sort order.
       let out = rows;
       if (skip > 0) out = out.slice(skip);
       if (take !== undefined) {
-        out = take < 0 ? [...out].reverse().slice(0, Math.abs(take)) : out.slice(0, take);
+        out = take < 0 ? out.slice(-Math.abs(take)) : out.slice(0, take);
       }
       return out;
     },

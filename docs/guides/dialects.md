@@ -28,7 +28,7 @@ Resolution order (first hit wins, fails soft):
 5. `'universal'` — emits only arguments valid on **every** Prisma database
 
 ```ts
-resolveDialect();                          // inspect what resolved right now
+resolveDialect(); // inspect what resolved right now
 // → { name: 'postgresql', capabilities: { caseInsensitiveMode: true, ... } }
 ```
 

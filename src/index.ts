@@ -41,12 +41,16 @@ export type {
   ApplyInclude,
   ApplyProjection,
   ApplySelect,
+  BuiltArgsOf,
   FindResultOf,
+  ProjectionArgs,
 } from './types/projection';
 
 // Public option/meta types
 export type {
   CursorDirection,
+  CursorType,
+  CursorValue,
   CursorMeta,
   FilterInput,
   PaginationMeta,

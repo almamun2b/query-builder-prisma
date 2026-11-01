@@ -1,6 +1,6 @@
 # Cursor pagination
 
-Cursor ("seek") pagination fetches the rows *after* (or before) a reference
+Cursor ("seek") pagination fetches the rows _after_ (or before) a reference
 row instead of skipping a computed offset. It stays fast on deep pages,
 doesn't skip or duplicate rows when data shifts between requests, and is the
 right model for infinite scroll, feeds, chats and any "load more" UI.
@@ -26,7 +26,8 @@ const { meta, data } = await new QueryBuilder(prisma.user)
 
 ```ts
 cursorPaginate(params: {
-  cursor?: string | number | Date | undefined;
+  cursor?: string | number | bigint | Date | undefined;
+  cursorType?: CursorType;                      // 'string' (default) | 'number' | 'bigint' | 'date'
   limit?: number;
   direction?: CursorDirection;                  // 'forward' (default) | 'backward'
   cursorField?: OrderKeyOf<D> | (string & {});  // default 'id'
@@ -34,13 +35,14 @@ cursorPaginate(params: {
 }): this
 ```
 
-| Parameter     | Meaning                                                                                                             |
-| ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `cursor`      | Value of `cursorField` from the edge row of the previous page. Omit it for the first page.                           |
-| `limit`       | Page size, clamped like [offset pagination](./pagination.md#clamping-and-limits). Default 10.                        |
-| `direction`   | `'forward'` walks toward later rows, `'backward'` toward earlier ones. Output order is unaffected (see below).        |
-| `cursorField` | The unique, sequential column to seek on. Default `'id'`. Pair it with a matching sort.                              |
-| `strict`      | Spend one extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact (see [Strict mode](#strict-mode)).        |
+| Parameter     | Meaning                                                                                                                                                              |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor`      | Value of `cursorField` from the edge row of the previous page. Omit it for the first page.                                                                           |
+| `cursorType`  | Converts `cursor` to the type of `cursorField` before it reaches Prisma (see [Numeric and date cursors](#numeric-and-date-cursors)). Default `'string'` = unchanged. |
+| `limit`       | Page size, clamped like [offset pagination](./pagination.md#clamping-and-limits). Default 10.                                                                        |
+| `direction`   | `'forward'` walks toward later rows, `'backward'` toward earlier ones. Output order is unaffected (see below).                                                       |
+| `cursorField` | The unique, sequential column to seek on. Default `'id'`. Pair it with a matching sort.                                                                              |
+| `strict`      | Spend one extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact (see [Strict mode](#strict-mode)).                                                       |
 
 Cursor mode **wins over offset mode** when both `.paginate()` and
 `.cursorPaginate()` are configured.
@@ -54,15 +56,17 @@ executeWithCursor(): Promise<{ meta: CursorMeta; data: FindResultOf<D, TArgs> }>
 Runs the seek query and trims the over-fetch into a clean page:
 
 - **Rows are always returned in the configured sort order**, regardless of
-  `direction` — a backward page is re-reversed so the UI can render it
-  without special-casing.
+  `direction` — a backward page needs no re-ordering to render
+  (Prisma itself returns negative-`take` rows in `orderBy` order; the extra
+  over-fetch row is trimmed from the far end).
 - `meta.nextCursor` / `meta.prevCursor` are `string | null` and opaque: pass
   them back as `cursor` for the following page. Call it with no cursor to get
   the first page.
 - `hasNextPage` / `hasPrevPage` are derived from a one-row over-fetch
   (`take: limit + 1`) — see [Strict mode](#strict-mode) for the exact variant.
 - Calling it without any `.cursorPaginate()` configuration is fine — it
-  paginates with defaults (first page, limit 10, `id`, forward).
+  paginates with defaults (first page, `id`, forward) and the `.paginate()`
+  limit if one was set, else 10. It never changes the builder.
 
 ## Walking pages
 
@@ -99,6 +103,31 @@ const prev = await new QueryBuilder(prisma.post)
 .cursorPaginate({ cursorField: 'createdAt', cursor: '2026-10-29T10:00:00.000Z' })
 ```
 
+## Numeric and date cursors
+
+`meta.nextCursor` / `meta.prevCursor` are always strings (`'42'`), but Prisma
+rejects a string for an `Int`, `BigInt` or `DateTime` cursor field
+(`Expected Int, provided String`). When the cursor comes back from a query
+string, tell the builder what the column holds with `cursorType`:
+
+```ts
+// GET /users?after=42      (id is an Int column)
+const { data, meta } = await new QueryBuilder(prisma.user)
+  .cursorPaginate({ cursor: req.query.after, cursorType: 'number', limit: 20 })
+  .executeWithCursor();
+// meta.nextCursor === '60' → send it to the client as a string, parse it the same way
+```
+
+| `cursorType`         | Conversion                     | Use for                    |
+| -------------------- | ------------------------------ | -------------------------- |
+| `'string'` (default) | none - passed through as given | `String`/`cuid`/`uuid` ids |
+| `'number'`           | `Number(cursor)`               | `Int` / `Float` columns    |
+| `'bigint'`           | `BigInt(cursor)`               | `BigInt` columns           |
+| `'date'`             | `new Date(cursor)`             | `DateTime` columns         |
+
+A cursor that cannot be converted (`'abc'` as a number) throws a descriptive
+error from `cursorPaginate()`, before any query is sent.
+
 ## Strict mode
 
 By default the edge flags are **optimistic**: `hasNextPage`/`hasPrevPage` come
@@ -111,16 +140,21 @@ query** to make the flags exact:
 .cursorPaginate({ cursor, limit: 20, strict: true })
 ```
 
-The probe mirrors the main query's `where`/`orderBy`, so it stays correct
-under filters. Use it when the UI must never show a dead "next" button;
+The probe is the main query with the seek replaced (same `where`, `orderBy` and
+`distinct`, whether they came from methods, `custom()` or `initialArgs`), fetches
+only the cursor field, and runs in parallel with the main query, so it stays
+correct under filters. Use it when the UI must never show a dead "next" button;
 skip it when an occasional empty fetch is acceptable and you want the minimum
 query count.
 
 ## Guards
 
 - **Projection guard.** `executeWithCursor()` throws when a `.select()`
-  projection drops `cursorField` — page cursors would be built from
-  `undefined`. Keep the cursor field in your projection or remove it:
+  projection (or a `custom({ omit })`) drops `cursorField` — page cursors would
+  be built from `undefined`. It also throws, naming the field, when a returned
+  edge row has a missing or `null` cursor value (a typo in `cursorField`, a
+  nullable column) or an Invalid Date. Keep the cursor field in your
+  projection or remove it:
 
   ```ts
   // throws: projection drops cursorField "id"
@@ -131,7 +165,7 @@ query count.
   ```
 
 - **Plain `.execute()` after `.cursorPaginate()`** returns raw seek-order rows
-  *including* the one-row over-fetch — that is the documented passthrough
+  _including_ the one-row over-fetch — that is the documented passthrough
   behavior for `buildArgs()`-style use. Always use `.executeWithCursor()` for
   trimmed, sort-ordered pages. See
   [Known limitations](../../README.md#known-limitations).

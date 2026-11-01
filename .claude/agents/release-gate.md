@@ -16,10 +16,9 @@ never run a real `npm publish`.
 3. **Coupling sweep** — `grep -rn "@prisma" src/ test/` and
    `grep -n "peerDependencies\|\"dependencies\"" package.json`. Both must be
    empty/absent.
-4. **Name/drift sweep** — `grep -rn --exclude=AUDIT.md --exclude=release-gate.md "@mamun/\|almamun2b/prisma-query-builder" src/ test/ README.md ARCHITECTURE.md AGENTS.md docs/ .claude/`
-   must be empty. The excludes skip the two legitimate historical mentions
-   (`docs/AUDIT.md`) and this file's own grep pattern, which would otherwise
-   self-match. The package is
+4. **Name/drift sweep** — `grep -rn --exclude=release-gate.md "@mamun/\|almamun2b/prisma-query-builder" src/ test/ README.md ARCHITECTURE.md AGENTS.md docs/ .claude/`
+   must be empty. The exclude skips this file's own grep pattern, which would
+   otherwise self-match. The package is
    `query-builder-prisma` and the repo is
    `github.com/almamun2b/query-builder-prisma`; confirm `package.json`
    `name` and `repository.url` agree with the README.

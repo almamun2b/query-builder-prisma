@@ -32,7 +32,7 @@ invariant 4). Never branch on a database name outside `src/dialects/`.
    `resolveDialect(this.dialect).capabilities.<flag>` — no name checks anywhere.
 4. Tests: one per representative dialect (has-flag / lacks-flag / universal) at
    the builder level, plus a registry-level test.
-5. Run the audit grep — output must be empty:
+5. Run the dialect-name grep — output must be empty:
    `grep -rniE "postgres|mysql|maria|sqlite|sqlserver|cockroach|mongo" src/core/ src/types/`
 6. `npm run verify` green.
 

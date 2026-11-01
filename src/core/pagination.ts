@@ -2,11 +2,17 @@
  * Offset ("skip/take") and cursor ("seek") pagination math — pure functions,
  * fully unit-testable without any database.
  */
-import type { CursorDirection, CursorMeta, PaginationMeta } from '../types/public';
+import type {
+  CursorDirection,
+  CursorMeta,
+  CursorType,
+  CursorValue,
+  PaginationMeta,
+} from '../types/public';
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_PAGE_SIZE = 1000;
-/** Upper bound for offset `skip` so deep pages cannot hit the DB unbounded (audit F18). */
+/** Upper bound for offset `skip` so deep pages cannot hit the DB unbounded (beyond it: empty page). */
 export const MAX_SKIP = 100_000;
 
 /** Clamp a page size to `[1, MAX_PAGE_SIZE]`; non-finite input gets the default. */
@@ -25,14 +31,21 @@ export function clampPage(page: number): number {
   return Math.max(1, Math.floor(page));
 }
 
-/** `skip`/`take` for a 1-based page + page size (both clamped, `skip` capped). */
+/**
+ * `skip`/`take` for a 1-based page + page size (both clamped). Pages whose `skip` would pass
+ * {@link MAX_SKIP} are not served as some other page: they get `take: 0` (an empty page) and
+ * `page` stays the requested one, so the result never claims rows it does not hold.
+ */
 export function toOffsetArgs(
   page: number,
   limit: number,
 ): { take: number; skip: number; page: number; limit: number } {
   const safePage = clampPage(page);
   const safeLimit = clampLimit(limit);
-  const skip = Math.min((safePage - 1) * safeLimit, MAX_SKIP);
+  const skip = (safePage - 1) * safeLimit;
+  if (skip > MAX_SKIP) {
+    return { take: 0, skip: MAX_SKIP, page: safePage, limit: safeLimit };
+  }
   return { take: safeLimit, skip, page: safePage, limit: safeLimit };
 }
 
@@ -50,16 +63,84 @@ export function buildPaginationMeta(total: number, page: number, limit: number):
 
 /**
  * Serialize one cursor value. Dates become ISO-8601 strings so cursors are
- * round-trippable and locale/TZ-independent (audit F4); everything else uses
+ * round-trippable and locale/TZ-independent; everything else uses
  * plain string coercion.
  */
 export function serializeCursorValue(value: unknown): string {
   return value instanceof Date ? value.toISOString() : String(value);
 }
 
+/**
+ * Convert an incoming cursor to the type of the cursor field (see {@link CursorType}).
+ * `'string'` leaves the value untouched; an unconvertible value throws a message naming it,
+ * before any query is sent.
+ */
+export function coerceCursor(
+  value: CursorValue | undefined,
+  type: CursorType,
+): CursorValue | undefined {
+  if (value === undefined || type === 'string') {
+    return value;
+  }
+  const bad = (): never => {
+    throw new Error(
+      `cursorPaginate(): cursor ${describeCursor(value)} is not a valid ${type} (cursorType: '${type}').`,
+    );
+  };
+  if (type === 'number') {
+    const n =
+      typeof value === 'string' ? (value.trim() === '' ? Number.NaN : Number(value)) : value;
+    return typeof n === 'number' && Number.isFinite(n) ? n : bad();
+  }
+  if (type === 'bigint') {
+    if (typeof value === 'bigint') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? BigInt(value) : bad();
+    }
+    if (typeof value === 'string' && /^\s*-?\d+\s*$/.test(value)) {
+      return BigInt(value.trim());
+    }
+    return bad();
+  }
+  if (typeof value === 'bigint') {
+    return bad();
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? bad() : date;
+}
+
+function describeCursor(value: unknown): string {
+  return typeof value === 'string' ? `"${value}"` : String(value);
+}
+
+/**
+ * The page cursor of one edge row. A missing/`null` field or an Invalid Date cannot make a usable
+ * cursor (it would otherwise become the literal string `"undefined"`/`"null"` or a bare
+ * `RangeError`), so they fail with a message that names the field.
+ */
+export function cursorValueOf(row: Record<string, unknown>, field: string): string {
+  const value = row[field];
+  if (value === undefined || value === null) {
+    throw new Error(
+      `executeWithCursor(): cursorField "${field}" is ${value === null ? 'null' : 'missing'} ` +
+        'on a returned row, so a page cursor cannot be built. Use a unique, non-null column ' +
+        'that is part of the result.',
+    );
+  }
+  if (value instanceof Date && Number.isNaN(value.getTime())) {
+    throw new Error(
+      `executeWithCursor(): cursorField "${field}" holds an Invalid Date, so a page cursor ` +
+        'cannot be built.',
+    );
+  }
+  return serializeCursorValue(value);
+}
+
 /** Everything needed to turn cursor options into `findMany` args. */
 export interface CursorPlan {
-  cursor?: string | number | Date | undefined;
+  cursor?: CursorValue | undefined;
   limit?: number | undefined;
   direction?: CursorDirection;
   cursorField: string;
@@ -90,7 +171,7 @@ export function toCursorArgs(plan: CursorPlan): {
   };
 }
 
-/** Exact edge flags from a strict-mode probe query (audit F10). */
+/** Exact edge flags from a strict-mode probe query. */
 export interface ExactCursorFlags {
   hasNextPage?: boolean | undefined;
   hasPrevPage?: boolean | undefined;
@@ -105,14 +186,14 @@ export interface CursorPageInfo {
   hadCursor: boolean;
   /**
    * Probe-derived flags (strict mode); each entry replaces the optimistic
-   * approximation for that edge (audit F10 / G9).
+   * approximation for that edge.
    */
   exactFlags?: ExactCursorFlags | undefined;
 }
 
 /**
- * Slice an over-fetched result set into the page + cursor metadata. Rows are
- * always returned in the configured sort order regardless of `direction`.
+ * Slice an over-fetched result set into the page + cursor metadata. `rows` are in the
+ * configured sort order (as Prisma returns them for both directions) and so is `data`.
  */
 export function buildCursorPage<T extends Record<string, unknown>>(
   rows: T[],
@@ -121,9 +202,15 @@ export function buildCursorPage<T extends Record<string, unknown>>(
   const { limit, direction, cursorField, hadCursor, exactFlags } = info;
   const safeLimit = clampLimit(limit);
 
+  // Prisma returns rows in `orderBy` order for BOTH directions (verified against a real
+  // client): a forward over-fetch row is the LAST one, a backward (negative-take)
+  // over-fetch row is the FIRST one - the farthest from the cursor. No reversing needed.
   const hasExtra = rows.length > safeLimit;
-  const pageRows = hasExtra ? rows.slice(0, safeLimit) : rows;
-  const ordered = direction === 'backward' ? [...pageRows].reverse() : pageRows;
+  const ordered = !hasExtra
+    ? rows
+    : direction === 'backward'
+      ? rows.slice(rows.length - safeLimit)
+      : rows.slice(0, safeLimit);
 
   const hasRows = rows.length > 0;
   const hasNextPage =
@@ -138,10 +225,8 @@ export function buildCursorPage<T extends Record<string, unknown>>(
     data: ordered,
     meta: {
       limit: safeLimit,
-      nextCursor:
-        hasNextPage && last !== undefined ? serializeCursorValue(last[cursorField]) : null,
-      prevCursor:
-        hasPrevPage && first !== undefined ? serializeCursorValue(first[cursorField]) : null,
+      nextCursor: hasNextPage && last !== undefined ? cursorValueOf(last, cursorField) : null,
+      prevCursor: hasPrevPage && first !== undefined ? cursorValueOf(first, cursorField) : null,
       hasNextPage,
       hasPrevPage,
     },
