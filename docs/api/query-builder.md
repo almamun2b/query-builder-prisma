@@ -359,7 +359,8 @@ Cursor-mode execution: trimmed, sort-ordered page rows plus
 `hasNextPage`, `hasPrevPage`).
 
 - Rows always follow the configured sort order, regardless of `direction`.
-- Throws when a `.select()` projection drops `cursorField`.
+- Throws when a `.select()` projection or `custom({ omit })` drops `cursorField`, or when a
+  returned edge row has a missing/`null` cursor value or an Invalid Date.
 - Callable without any `.cursorPaginate()` — paginates with defaults
   (first page, `id`, forward; limit from `.paginate()` if set, else 10) and
   leaves the builder unchanged.

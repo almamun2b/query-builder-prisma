@@ -123,8 +123,11 @@ query count.
 ## Guards
 
 - **Projection guard.** `executeWithCursor()` throws when a `.select()`
-  projection drops `cursorField` — page cursors would be built from
-  `undefined`. Keep the cursor field in your projection or remove it:
+  projection (or a `custom({ omit })`) drops `cursorField` — page cursors would
+  be built from `undefined`. It also throws, naming the field, when a returned
+  edge row has a missing or `null` cursor value (a typo in `cursorField`, a
+  nullable column) or an Invalid Date. Keep the cursor field in your
+  projection or remove it:
 
   ```ts
   // throws: projection drops cursorField "id"

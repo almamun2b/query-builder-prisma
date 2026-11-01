@@ -187,3 +187,30 @@ describe('buildCursorPage', () => {
     expect(meta.hasPrevPage).toBe(true);
   });
 });
+
+describe('buildCursorPage cursor value validation', () => {
+  const info = {
+    limit: 1,
+    direction: 'forward' as const,
+    cursorField: 'id',
+    hadCursor: false,
+  };
+
+  it('throws a descriptive error when the edge row lacks the cursor field', () => {
+    expect(() => buildCursorPage([{ other: 1 }, { other: 2 }], info)).toThrow('cursorField "id"');
+  });
+
+  it('throws when the cursor field is null', () => {
+    expect(() => buildCursorPage([{ id: null }, { id: 'b' }], info)).toThrow('cursorField "id"');
+  });
+
+  it('throws a descriptive error for an Invalid Date instead of a bare RangeError', () => {
+    const rows = [{ id: new Date('nope') }, { id: new Date('2026-01-01') }];
+    expect(() => buildCursorPage(rows, info)).toThrow('Invalid Date');
+  });
+
+  it('does not require the field when no cursor is derived', () => {
+    const { meta } = buildCursorPage([{ other: 1 }], info);
+    expect(meta.nextCursor).toBeNull();
+  });
+});

@@ -165,7 +165,9 @@ Semantics you can build on (the tests pin these):
   empty. `cursorPaginate({ strict: true })` spends one extra 1-row probe query
   to make both flags exact.
 - **Cursor projection guard** — `executeWithCursor()` throws when a `.select()`
-  projection drops `cursorField` (cursors would be built from `undefined`).
+  projection (or a `custom({ omit })`) drops `cursorField`, and when a returned
+  edge row has a missing/`null` cursor value or an Invalid Date (the page
+  cursor cannot be built) — never a cursor of `"undefined"`/`"null"`.
 - **Clamping** — `limit` is clamped silently to `[1, 1000]`; pages below 1
   become page 1; a page whose computed `skip` exceeds `100_000` is served as an
   **empty page** (`take: 0`) with `meta.page` still the requested page — never as

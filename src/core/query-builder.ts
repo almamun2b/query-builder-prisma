@@ -638,10 +638,11 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   /** A projection without the cursor field would derive cursors from `undefined`. */
   private assertCursorFieldProjected(field: string): void {
     const select = this.resolveProjection().select as Record<string, unknown> | undefined;
-    if (select && !select[field]) {
+    const omit = this.customArgs.omit as Record<string, unknown> | undefined;
+    if ((select && !select[field]) || omit?.[field] === true) {
       throw new Error(
         `executeWithCursor(): the projection drops cursorField "${field}", so page ` +
-          'cursors would be built from undefined. Keep the field in .select() or remove the projection.',
+          'cursors would be built from undefined. Keep the field in .select() (or out of omit) or remove the projection.',
       );
     }
   }

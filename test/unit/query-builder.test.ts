@@ -454,6 +454,22 @@ describe('QueryBuilder cursor pagination', () => {
     expect(recorded.findManyCalls[1]?.take).toBe(1);
   });
 
+  it('throws when a custom() omit drops the cursor field', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(5));
+    await expect(
+      new QueryBuilder(delegate).custom({ omit: { id: true } }).executeWithCursor(),
+    ).rejects.toThrow('cursorField "id"');
+  });
+
+  it('throws instead of emitting a bogus cursor for an unknown cursorField', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    await expect(
+      new QueryBuilder(delegate)
+        .cursorPaginate({ cursorField: 'nope', limit: 5 })
+        .executeWithCursor(),
+    ).rejects.toThrow('cursorField "nope"');
+  });
+
   it('strict probe inherits seeded orderBy, distinct and where from the main query', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(30));
     await new QueryBuilder(delegate, { initialArgs: { orderBy: { email: 'desc' } } })

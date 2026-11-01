@@ -14,6 +14,7 @@ export interface FakeFindArgs {
   where?: Record<string, unknown>;
   select?: Record<string, boolean | object>;
   include?: Record<string, boolean | object>;
+  omit?: Record<string, boolean>;
   orderBy?: Record<string, 'asc' | 'desc'> | Record<string, 'asc' | 'desc'>[];
   skip?: number;
   take?: number;

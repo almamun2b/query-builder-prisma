@@ -64,6 +64,29 @@ export function serializeCursorValue(value: unknown): string {
   return value instanceof Date ? value.toISOString() : String(value);
 }
 
+/**
+ * The page cursor of one edge row. A missing/`null` field or an Invalid Date cannot make a usable
+ * cursor (it would otherwise become the literal string `"undefined"`/`"null"` or a bare
+ * `RangeError`), so they fail with a message that names the field.
+ */
+export function cursorValueOf(row: Record<string, unknown>, field: string): string {
+  const value = row[field];
+  if (value === undefined || value === null) {
+    throw new Error(
+      `executeWithCursor(): cursorField "${field}" is ${value === null ? 'null' : 'missing'} ` +
+        'on a returned row, so a page cursor cannot be built. Use a unique, non-null column ' +
+        'that is part of the result.',
+    );
+  }
+  if (value instanceof Date && Number.isNaN(value.getTime())) {
+    throw new Error(
+      `executeWithCursor(): cursorField "${field}" holds an Invalid Date, so a page cursor ` +
+        'cannot be built.',
+    );
+  }
+  return serializeCursorValue(value);
+}
+
 /** Everything needed to turn cursor options into `findMany` args. */
 export interface CursorPlan {
   cursor?: string | number | Date | undefined;
@@ -151,10 +174,8 @@ export function buildCursorPage<T extends Record<string, unknown>>(
     data: ordered,
     meta: {
       limit: safeLimit,
-      nextCursor:
-        hasNextPage && last !== undefined ? serializeCursorValue(last[cursorField]) : null,
-      prevCursor:
-        hasPrevPage && first !== undefined ? serializeCursorValue(first[cursorField]) : null,
+      nextCursor: hasNextPage && last !== undefined ? cursorValueOf(last, cursorField) : null,
+      prevCursor: hasPrevPage && first !== undefined ? cursorValueOf(first, cursorField) : null,
       hasNextPage,
       hasPrevPage,
     },
