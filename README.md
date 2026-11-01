@@ -173,7 +173,16 @@ Semantics you can build on (the tests pin these):
 - **`includeTotal`** — `executeWithMeta({ includeTotal: false })` skips the
   `COUNT` query; `meta` then carries `total: null` / `totalPage: null`.
 - **Defaults** — `executeWithMeta()` without pagination defaults to page 1,
-  limit 10 so `meta` always describes the returned data.
+  limit 10 so `meta` always describes the returned data. `executeWithCursor()`
+  without `.cursorPaginate()` starts at the first page and uses the
+  `.paginate()` limit when one was set (default 10). Neither execute method
+  changes the builder: a later `execute()` or the other pagination mode behaves
+  as if it had not run.
+- **Strict cursor probe** — `strict: true` sends one extra 1-row query built from
+  the main query (same `where`, `orderBy` and `distinct` from every source),
+  fetching only the cursor field, in parallel with the main query.
+- **Cursor mode owns `cursor`/`skip`/`take`** — raw `custom({ cursor, skip, take })`
+  values are replaced, not merged, once `.cursorPaginate()` is configured.
 - **`.first()`** — forces `take: 1` and drops `skip`/`cursor`: it returns the
   first row of the whole result set, not of a configured page.
 - **`search()`** — pass scalar string fields only (relation keys compile but

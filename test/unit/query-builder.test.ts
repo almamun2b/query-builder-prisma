@@ -448,6 +448,66 @@ describe('QueryBuilder cursor pagination', () => {
     expect(recorded.findManyCalls[1]?.take).toBe(1);
   });
 
+  it('strict probe inherits seeded orderBy, distinct and where from the main query', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate, { initialArgs: { orderBy: { email: 'desc' } } })
+      .filter({ status: 'ACTIVE' })
+      .custom({ distinct: ['email'] })
+      .cursorPaginate({ cursor: 'u5', limit: 3, strict: true })
+      .executeWithCursor();
+    const probe = recorded.findManyCalls[1];
+    expect(probe?.orderBy).toEqual({ email: 'desc' });
+    expect(probe?.distinct).toEqual(['email']);
+    expect(probe?.where).toEqual({ status: 'ACTIVE' });
+    expect(probe?.take).toBe(-1);
+    expect(probe?.cursor).toEqual({ id: 'u5' });
+    expect(probe?.skip).toBe(1);
+  });
+
+  it('strict probe fetches only the cursor field, never a projection or include', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate)
+      .include({ posts: true })
+      .cursorPaginate({ cursor: 'u5', limit: 3, strict: true })
+      .executeWithCursor();
+    const probe = recorded.findManyCalls[1];
+    expect(probe?.select).toEqual({ id: true });
+    expect(probe?.include).toBeUndefined();
+  });
+
+  it('strict probe and main query run concurrently', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const slow = {
+      findMany: async (args?: Parameters<typeof delegate.findMany>[0]) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        try {
+          return await delegate.findMany(args);
+        } finally {
+          inFlight -= 1;
+        }
+      },
+      count: delegate.count,
+    };
+    await new QueryBuilder(slow)
+      .cursorPaginate({ cursor: 'u5', limit: 3, strict: true })
+      .executeWithCursor();
+    expect(maxInFlight).toBe(2);
+  });
+
+  it('custom cursor/skip do not leak into cursor mode when no cursor was given', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate)
+      .custom({ cursor: { id: 'u9' }, skip: 4 })
+      .cursorPaginate({ limit: 3 })
+      .execute();
+    expect(recorded.findManyArgs?.cursor).toBeUndefined();
+    expect(recorded.findManyArgs?.skip).toBeUndefined();
+  });
+
   it('no probe query without strict', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(30));
     await new QueryBuilder(delegate).cursorPaginate({ cursor: 'u0', limit: 5 }).executeWithCursor();
@@ -529,6 +589,35 @@ describe('QueryBuilder extras', () => {
       .cursorPaginate({ limit: 2 })
       .executeWithCursor();
     expect(result.data).toHaveLength(2);
+  });
+
+  it('execute methods never change the builder: execute() after executeWithMeta() is unpaginated', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    const qb = new QueryBuilder(delegate);
+    await qb.executeWithMeta();
+    await qb.execute();
+    expect(recorded.findManyArgs?.take).toBeUndefined();
+    expect(recorded.findManyArgs?.skip).toBeUndefined();
+  });
+
+  it('executeWithCursor() does not switch the builder into cursor mode', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    const qb = new QueryBuilder(delegate);
+    await qb.executeWithCursor();
+    const { meta } = await qb.executeWithMeta();
+    expect(meta.page).toBe(1);
+    expect(recorded.findManyArgs?.take).toBe(10);
+    expect(recorded.findManyArgs?.skip).toBe(0);
+  });
+
+  it('executeWithCursor() falls back to the paginate() limit', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(60));
+    const { data, meta } = await new QueryBuilder(delegate)
+      .paginate({ limit: 25 })
+      .executeWithCursor();
+    expect(recorded.findManyArgs?.take).toBe(26);
+    expect(data).toHaveLength(25);
+    expect(meta.limit).toBe(25);
   });
 
   it('paginate().first() returns the global first row', async () => {

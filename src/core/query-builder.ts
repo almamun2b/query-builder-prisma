@@ -90,6 +90,24 @@ type WithCustom<TArgs, C> = TArgs extends { select: unknown } | { include: unkno
       ? Omit<TArgs, 'customSelect' | 'customInclude'> & { customInclude: I }
       : TArgs;
 
+/** Resolved pagination handed to `compose()`; keeps the execute methods free of state writes. */
+type Paging = OffsetPaging | CursorPaging;
+
+interface OffsetPaging {
+  kind: 'offset';
+  page: number;
+  limit: number;
+}
+
+interface CursorPaging {
+  kind: 'cursor';
+  cursor: string | number | Date | undefined;
+  limit: number | undefined;
+  direction: CursorDirection;
+  field: string;
+  strict: boolean;
+}
+
 /** Thrown by {@link QueryBuilder.firstOrThrow} when no row matched. */
 export class NoResultError extends Error {
   constructor() {
@@ -365,40 +383,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
 
   /** The fully assembled `findMany` args. Useful for debugging or reuse. */
   buildArgs(): BuiltArgsOf<D, TArgs> {
-    const args: Record<string, unknown> = { ...this.customArgs };
-
-    const where = this.buildWhere();
-    if (where) {
-      args.where = where;
-    }
-    if (this.orderByArg) {
-      args.orderBy = this.orderByArg;
-    }
-    Object.assign(args, this.resolveProjection());
-
-    if (this.cursorActive) {
-      const cursorArgs = toCursorArgs({
-        cursor: this.cursor,
-        limit: this.cursorLimit,
-        direction: this.cursorDirection,
-        cursorField: this.cursorField,
-      });
-      args.take = cursorArgs.take;
-      if (cursorArgs.cursor) {
-        args.cursor = cursorArgs.cursor;
-      }
-      if (cursorArgs.skip !== undefined) {
-        args.skip = cursorArgs.skip;
-      }
-    } else if (this.limit !== undefined) {
-      const page = this.page ?? 1;
-      this.assertSkipCap(page, this.limit);
-      const offset = toOffsetArgs(page, this.limit);
-      args.take = offset.take;
-      args.skip = offset.skip;
-    }
-
-    return args as BuiltArgsOf<D, TArgs>;
+    return this.compose(this.currentPaging()) as BuiltArgsOf<D, TArgs>;
   }
 
   /**
@@ -408,25 +393,17 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * `prisma.user.findMany(qb.buildArgs())` — same args, Prisma's own overloads.
    */
   async execute(): Promise<FindResultOf<D, TArgs>> {
-    const findMany = this.delegate.findMany.bind(this.delegate) as unknown as (
-      args: object,
-    ) => Promise<unknown>;
-    const data = await findMany(this.buildArgs());
-    return data as FindResultOf<D, TArgs>;
+    return (await this.callFindMany(this.buildArgs())) as FindResultOf<D, TArgs>;
   }
 
   /** Executes the query and returns the first row, or `null` when none matched. */
   async first(): Promise<ApplyProjection<RowElementOf<D>, TArgs> | null> {
-    const args = { ...(this.buildArgs() as object) } as Record<string, unknown>;
+    const args = this.compose(undefined);
     args.take = 1;
     delete args.skip;
     delete args.cursor;
-    const findMany = this.delegate.findMany.bind(this.delegate) as unknown as (
-      args: object,
-    ) => Promise<unknown>;
-    const rows = (await findMany(args)) as unknown[];
-    const row = rows[0];
-    return (row ?? null) as ApplyProjection<RowElementOf<D>, TArgs> | null;
+    const rows = (await this.callFindMany(args)) as unknown[];
+    return (rows[0] ?? null) as ApplyProjection<RowElementOf<D>, TArgs> | null;
   }
 
   /** Like {@link first}, but throws {@link NoResultError} when nothing matched. */
@@ -440,18 +417,14 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
 
   /** Counts rows matching the current filters (ignores pagination/projection). */
   async count(): Promise<number> {
-    const where = this.buildWhere();
-    const countFn = this.delegate.count.bind(this.delegate) as unknown as (
-      args: object,
-    ) => Promise<number>;
-    return countFn(where ? { where } : {});
+    return this.callCount(this.buildWhere());
   }
 
   /**
    * Executes the query and returns the rows plus offset pagination metadata.
    * When no pagination was configured, defaults to page 1, limit 10 so `meta`
-   * always describes the data actually returned. `count` and `findMany` run in
-   * parallel.
+   * always describes the data actually returned - without changing the builder.
+   * `count` and `findMany` run in parallel.
    *
    * Pass `{ includeTotal: false }` to skip the `COUNT` query entirely — `meta`
    * then carries `total: null` / `totalPage: null`.
@@ -473,86 +446,160 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
           'configured via cursorPaginate(). Use executeWithCursor() instead.',
       );
     }
-    if (this.limit === undefined) {
-      this.paginate({ page: 1, limit: DEFAULT_PAGE_SIZE });
-    }
+    const page = this.page ?? 1;
+    const limit = this.limit ?? DEFAULT_PAGE_SIZE;
     // Fail before the COUNT goes out (strictNumbers + skip cap).
-    this.assertSkipCap(this.page ?? 1, this.limit ?? DEFAULT_PAGE_SIZE);
-    const offset = toOffsetArgs(this.page ?? 1, this.limit ?? DEFAULT_PAGE_SIZE);
+    this.assertSkipCap(page, limit);
+    const offset = toOffsetArgs(page, limit);
+    const args = this.compose({ kind: 'offset', page, limit });
 
     if (opts?.includeTotal === false) {
-      const data = await this.execute();
+      const data = (await this.callFindMany(args)) as FindResultOf<D, TArgs>;
       return {
         meta: { page: offset.page, limit: offset.limit, total: null, totalPage: null },
         data,
       };
     }
 
-    const [total, data] = await Promise.all([this.count(), this.execute()]);
-
-    return {
-      meta: buildPaginationMeta(total, offset.page, offset.limit),
-      data,
-    };
+    const [total, data] = await Promise.all([
+      this.callCount(this.buildWhere()),
+      this.callFindMany(args) as Promise<FindResultOf<D, TArgs>>,
+    ]);
+    return { meta: buildPaginationMeta(total, offset.page, offset.limit), data };
   }
 
   /**
    * Executes a cursor-paginated query (see {@link cursorPaginate}) and returns
    * the page rows plus `next`/`prev` cursors. Rows are always returned in the
-   * configured sort order, regardless of pagination `direction`.
+   * configured sort order, regardless of pagination `direction`. Without a
+   * prior `cursorPaginate()` call it starts at the first page, using the
+   * `paginate()` limit when one was set (default 10) - the builder is not modified.
    *
    * Throws when a `.select()` projection drops `cursorField` — the page cursors
    * are derived from that field and would come out as `undefined`.
    */
   async executeWithCursor(): Promise<{ meta: CursorMeta; data: FindResultOf<D, TArgs> }> {
-    if (!this.cursorActive) {
-      this.cursorPaginate({});
-    }
-    this.assertCursorFieldProjected();
-    const limit = this.cursorLimit ?? DEFAULT_PAGE_SIZE;
-    const hadCursor = this.cursor !== undefined;
-
-    const findMany = this.delegate.findMany.bind(this.delegate) as unknown as (
-      args: object,
-    ) => Promise<Record<string, unknown>[]>;
-    const rows = await findMany(this.buildArgs());
+    const paging = this.cursorPaging();
+    this.assertCursorFieldProjected(paging.field);
+    const hadCursor = paging.cursor !== undefined;
+    const mainArgs = this.compose(paging);
 
     // Strict mode spends one extra 1-row probe query to make the optimistic
-    // opposite edge exact: forward pages probe the row before
-    // the cursor, backward pages the row after it. The probe mirrors the main
-    // query's `where`/`orderBy` — Prisma positions the cursor within the
-    // query's own sort order and filters.
-    let exactFlags: ExactCursorFlags | undefined;
-    if (this.cursorStrict && hadCursor) {
-      const probeArgs: Record<string, unknown> = {
-        take: this.cursorDirection === 'forward' ? -1 : 1,
-        cursor: { [this.cursorField]: this.cursor },
+    // opposite edge exact: forward pages probe the row before the cursor,
+    // backward pages the row after it. The probe is the main query with the
+    // seek replaced, so it inherits `where`, `orderBy` and `distinct` from every
+    // source - Prisma positions the cursor within the query's own order and
+    // filters - and fetches only the cursor field. It runs in parallel.
+    let probeArgs: Record<string, unknown> | undefined;
+    if (paging.strict && hadCursor) {
+      probeArgs = {
+        ...mainArgs,
+        take: paging.direction === 'forward' ? -1 : 1,
+        cursor: { [paging.field]: paging.cursor },
         skip: 1,
+        select: { [paging.field]: true },
       };
-      const where = this.buildWhere();
-      if (where) {
-        probeArgs.where = where;
-      }
-      if (this.orderByArg) {
-        probeArgs.orderBy = this.orderByArg;
-      }
-      const probe = await findMany(probeArgs);
+      delete probeArgs.include;
+      delete probeArgs.omit;
+    }
+
+    const [rows, probe] = await Promise.all([
+      this.callFindMany(mainArgs) as Promise<Record<string, unknown>[]>,
+      probeArgs ? (this.callFindMany(probeArgs) as Promise<unknown[]>) : undefined,
+    ]);
+
+    let exactFlags: ExactCursorFlags | undefined;
+    if (probe) {
       const hasEdgeRow = probe.length > 0;
       exactFlags =
-        this.cursorDirection === 'forward'
-          ? { hasPrevPage: hasEdgeRow }
-          : { hasNextPage: hasEdgeRow };
+        paging.direction === 'forward' ? { hasPrevPage: hasEdgeRow } : { hasNextPage: hasEdgeRow };
     }
 
     const { data, meta } = buildCursorPage(rows, {
-      limit,
-      direction: this.cursorDirection,
-      cursorField: this.cursorField,
+      limit: paging.limit ?? DEFAULT_PAGE_SIZE,
+      direction: paging.direction,
+      cursorField: paging.field,
       hadCursor,
       exactFlags,
     });
 
     return { meta, data: data as unknown as FindResultOf<D, TArgs> };
+  }
+
+  /** The pagination the builder is configured for, if any (state is read, never written). */
+  private currentPaging(): Paging | undefined {
+    if (this.cursorActive) {
+      return this.cursorPaging();
+    }
+    if (this.limit !== undefined) {
+      return { kind: 'offset', page: this.page ?? 1, limit: this.limit };
+    }
+    return undefined;
+  }
+
+  /**
+   * Cursor settings. Without `cursorPaginate()` this is the first page with defaults; the
+   * `paginate()` limit is honoured as the page size when no cursor limit was given.
+   */
+  private cursorPaging(): CursorPaging {
+    return {
+      kind: 'cursor',
+      cursor: this.cursorActive ? this.cursor : undefined,
+      limit: this.cursorLimit ?? this.limit,
+      direction: this.cursorActive ? this.cursorDirection : 'forward',
+      field: this.cursorActive ? this.cursorField : 'id',
+      strict: this.cursorActive ? this.cursorStrict : false,
+    };
+  }
+
+  /** Folds the builder state plus an explicit paging plan into `findMany` args (fresh object). */
+  private compose(paging: Paging | undefined): Record<string, unknown> {
+    const args: Record<string, unknown> = { ...this.customArgs };
+
+    const where = this.buildWhere();
+    if (where) {
+      args.where = where;
+    }
+    if (this.orderByArg) {
+      args.orderBy = this.orderByArg;
+    }
+    Object.assign(args, this.resolveProjection());
+
+    if (paging?.kind === 'cursor') {
+      // Cursor mode owns cursor/skip/take: raw `custom()` leftovers must not leak in.
+      delete args.cursor;
+      delete args.skip;
+      const cursorArgs = toCursorArgs({
+        cursor: paging.cursor,
+        limit: paging.limit,
+        direction: paging.direction,
+        cursorField: paging.field,
+      });
+      args.take = cursorArgs.take;
+      if (cursorArgs.cursor) {
+        args.cursor = cursorArgs.cursor;
+      }
+      if (cursorArgs.skip !== undefined) {
+        args.skip = cursorArgs.skip;
+      }
+    } else if (paging?.kind === 'offset') {
+      this.assertSkipCap(paging.page, paging.limit);
+      const offset = toOffsetArgs(paging.page, paging.limit);
+      args.take = offset.take;
+      args.skip = offset.skip;
+    }
+
+    return args;
+  }
+
+  private callFindMany(args: object): Promise<unknown> {
+    const findMany = this.delegate.findMany as unknown as (args: object) => Promise<unknown>;
+    return findMany.call(this.delegate, args);
+  }
+
+  private callCount(where: object | undefined): Promise<number> {
+    const count = this.delegate.count as unknown as (args: object) => Promise<number>;
+    return count.call(this.delegate, where ? { where } : {});
   }
 
   /** strictNumbers: out-of-range limits throw instead of clamping. */
@@ -589,11 +636,11 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   }
 
   /** A projection without the cursor field would derive cursors from `undefined`. */
-  private assertCursorFieldProjected(): void {
+  private assertCursorFieldProjected(field: string): void {
     const select = this.resolveProjection().select as Record<string, unknown> | undefined;
-    if (select && !select[this.cursorField]) {
+    if (select && !select[field]) {
       throw new Error(
-        `executeWithCursor(): the projection drops cursorField "${this.cursorField}", so page ` +
+        `executeWithCursor(): the projection drops cursorField "${field}", so page ` +
           'cursors would be built from undefined. Keep the field in .select() or remove the projection.',
       );
     }

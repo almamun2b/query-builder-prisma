@@ -44,7 +44,8 @@ Runs the query and returns rows + offset metadata:
 
 - `count()` and `findMany()` run **in parallel**.
 - With **no pagination configured**, it defaults to page 1, limit 10 so `meta`
-  always describes the data actually returned.
+  always describes the data actually returned (the builder is not modified, so
+  a later `execute()` is still unpaginated).
 - With `opts.includeTotal === false` the `COUNT` query is **skipped entirely**;
   `meta` then carries `total: null` / `totalPage: null` and the return type is
   `PaginationMetaNoTotal`. Useful for large tables where a count is too

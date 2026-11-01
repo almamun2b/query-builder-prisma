@@ -337,7 +337,7 @@ Offset-mode execution: rows plus pagination metadata. `count()` and
 Behavior:
 
 - Without pagination configured, defaults to page 1, limit 10 so `meta` always
-  describes the returned data.
+  describes the returned data - the builder itself is not changed.
 - **Throws when cursor pagination is configured** — offset meta cannot
   describe a seek query; use [`executeWithCursor()`](#executewithcursor).
 - With `strictNumbers: true`, an out-of-cap skip throws before the `COUNT`
@@ -360,7 +360,8 @@ Cursor-mode execution: trimmed, sort-ordered page rows plus
 - Rows always follow the configured sort order, regardless of `direction`.
 - Throws when a `.select()` projection drops `cursorField`.
 - Callable without any `.cursorPaginate()` — paginates with defaults
-  (first page, limit 10, `id`, forward).
+  (first page, `id`, forward; limit from `.paginate()` if set, else 10) and
+  leaves the builder unchanged.
 
 ```ts
 const { meta, data } = await qb

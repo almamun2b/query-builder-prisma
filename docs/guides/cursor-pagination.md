@@ -63,7 +63,8 @@ Runs the seek query and trims the over-fetch into a clean page:
 - `hasNextPage` / `hasPrevPage` are derived from a one-row over-fetch
   (`take: limit + 1`) — see [Strict mode](#strict-mode) for the exact variant.
 - Calling it without any `.cursorPaginate()` configuration is fine — it
-  paginates with defaults (first page, limit 10, `id`, forward).
+  paginates with defaults (first page, `id`, forward) and the `.paginate()`
+  limit if one was set, else 10. It never changes the builder.
 
 ## Walking pages
 
@@ -112,8 +113,10 @@ query** to make the flags exact:
 .cursorPaginate({ cursor, limit: 20, strict: true })
 ```
 
-The probe mirrors the main query's `where`/`orderBy`, so it stays correct
-under filters. Use it when the UI must never show a dead "next" button;
+The probe is the main query with the seek replaced (same `where`, `orderBy` and
+`distinct`, whether they came from methods, `custom()` or `initialArgs`), fetches
+only the cursor field, and runs in parallel with the main query, so it stays
+correct under filters. Use it when the UI must never show a dead "next" button;
 skip it when an occasional empty fetch is acceptable and you want the minimum
 query count.
 
