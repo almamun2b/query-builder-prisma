@@ -99,8 +99,10 @@ describe('buildCursorPage', () => {
     expect(meta.prevCursor).toBeNull();
   });
 
-  it('backward: reverses rows so output stays in sort order', () => {
-    const rows = [mk(20), mk(19), mk(18)];
+  it('backward: Prisma returns negative-take rows in sort order, over-fetch row first', () => {
+    // Verified against a real Prisma client: take -3 with a cursor at u21 returns
+    // [u18, u19, u20] - ascending, the extra row (u18) is the farthest from the cursor.
+    const rows = [mk(18), mk(19), mk(20)];
     const { data, meta } = buildCursorPage(rows, {
       limit: 2,
       direction: 'backward',
@@ -109,7 +111,21 @@ describe('buildCursorPage', () => {
     });
     expect(data.map((r) => r.id)).toEqual(['u19', 'u20']);
     expect(meta.hasPrevPage).toBe(true);
+    expect(meta.hasNextPage).toBe(true);
     expect(meta.prevCursor).toBe('u19');
+    expect(meta.nextCursor).toBe('u20');
+  });
+
+  it('backward without an extra row returns every row unchanged, no previous page', () => {
+    const rows = [mk(19), mk(20)];
+    const { data, meta } = buildCursorPage(rows, {
+      limit: 2,
+      direction: 'backward',
+      cursorField: 'id',
+      hadCursor: true,
+    });
+    expect(data.map((r) => r.id)).toEqual(['u19', 'u20']);
+    expect(meta.hasPrevPage).toBe(false);
   });
 
   it('no extra rows means no next page', () => {

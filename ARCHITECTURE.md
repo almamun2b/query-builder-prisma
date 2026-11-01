@@ -112,8 +112,9 @@ anything not re-exported there does not exist for consumers.
    (methods, the `initialArgs` seed, `.custom({ where })`).
 3. An execute path runs the delegate call(s): `execute`, `first`/`firstOrThrow`,
    `count`, `executeWithMeta` (offset; `count` + `findMany` in parallel),
-   `executeWithCursor` (over-fetches one row to detect the next page; slices and
-   reverses in `buildCursorPage` so output is always in configured sort order).
+   `executeWithCursor` (over-fetches one row to detect the next/previous page;
+   `buildCursorPage` drops it - the last row going forward, the first row going
+   backward, because Prisma returns negative-`take` rows in `orderBy` order too).
 
 Cursor mode wins over offset mode when both are configured.
 

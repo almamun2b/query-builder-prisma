@@ -319,6 +319,56 @@ describe('QueryBuilder cursor pagination', () => {
     expect(recorded.findManyArgs?.skip).toBe(1);
   });
 
+  it('backward page returns the rows just before the cursor, in sort order', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    const { data, meta } = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: 'u25', direction: 'backward', limit: 10 })
+      .executeWithCursor();
+    expect(data.map((r) => r.id)).toEqual([
+      'u15',
+      'u16',
+      'u17',
+      'u18',
+      'u19',
+      'u20',
+      'u21',
+      'u22',
+      'u23',
+      'u24',
+    ]);
+    expect(meta.hasPrevPage).toBe(true);
+    expect(meta.prevCursor).toBe('u15');
+    expect(meta.nextCursor).toBe('u24');
+  });
+
+  it('backward page near the start has no previous page', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    const { data, meta } = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: 'u4', direction: 'backward', limit: 10 })
+      .executeWithCursor();
+    expect(data.map((r) => r.id)).toEqual(['u0', 'u1', 'u2', 'u3']);
+    expect(meta.hasPrevPage).toBe(false);
+    expect(meta.prevCursor).toBeNull();
+  });
+
+  it('walking forward then backward revisits the same page', async () => {
+    const { delegate } = createFakeDelegate(fakeRows(30));
+    const page1 = await new QueryBuilder(delegate)
+      .cursorPaginate({ limit: 10 })
+      .executeWithCursor();
+    const page2 = await new QueryBuilder(delegate)
+      .cursorPaginate({ cursor: page1.meta.nextCursor ?? undefined, limit: 10 })
+      .executeWithCursor();
+    const back = await new QueryBuilder(delegate)
+      .cursorPaginate({
+        cursor: page2.meta.prevCursor ?? undefined,
+        limit: 10,
+        direction: 'backward',
+      })
+      .executeWithCursor();
+    expect(back.data.map((r) => r.id)).toEqual(page1.data.map((r) => r.id));
+  });
+
   it('next cursor round-trips to the following page without overlap', async () => {
     const { delegate } = createFakeDelegate(fakeRows(30));
     const page1 = await new QueryBuilder(delegate)

@@ -111,8 +111,8 @@ export interface CursorPageInfo {
 }
 
 /**
- * Slice an over-fetched result set into the page + cursor metadata. Rows are
- * always returned in the configured sort order regardless of `direction`.
+ * Slice an over-fetched result set into the page + cursor metadata. `rows` are in the
+ * configured sort order (as Prisma returns them for both directions) and so is `data`.
  */
 export function buildCursorPage<T extends Record<string, unknown>>(
   rows: T[],
@@ -121,9 +121,15 @@ export function buildCursorPage<T extends Record<string, unknown>>(
   const { limit, direction, cursorField, hadCursor, exactFlags } = info;
   const safeLimit = clampLimit(limit);
 
+  // Prisma returns rows in `orderBy` order for BOTH directions (verified against a real
+  // client): a forward over-fetch row is the LAST one, a backward (negative-take)
+  // over-fetch row is the FIRST one - the farthest from the cursor. No reversing needed.
   const hasExtra = rows.length > safeLimit;
-  const pageRows = hasExtra ? rows.slice(0, safeLimit) : rows;
-  const ordered = direction === 'backward' ? [...pageRows].reverse() : pageRows;
+  const ordered = !hasExtra
+    ? rows
+    : direction === 'backward'
+      ? rows.slice(rows.length - safeLimit)
+      : rows.slice(0, safeLimit);
 
   const hasRows = rows.length > 0;
   const hasNextPage =

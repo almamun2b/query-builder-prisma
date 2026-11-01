@@ -68,8 +68,9 @@ export function createFakeDelegate(rows: FakeRow[] = []): {
 
       // Emulate Prisma cursor semantics: the cursor anchors AT the matching
       // row, `skip: 1` excludes the cursor row, positive take walks forward,
-      // negative take walks backward (nearest first, returned in seek order —
-      // the builder re-reverses backward pages itself).
+      // negative take walks backward. Verified against a real Prisma client: the
+      // rows come back in `orderBy` order (NOT reversed), so the nearest row to the
+      // cursor is LAST and the farthest - the over-fetch row - is first.
       const cursorArg = args?.cursor;
       const firstCursor = cursorArg ? Object.entries(cursorArg)[0] : undefined;
       if (firstCursor !== undefined) {
@@ -79,18 +80,18 @@ export function createFakeDelegate(rows: FakeRow[] = []): {
           return [];
         }
         if (take !== undefined && take < 0) {
-          return rows.slice(0, anchor).reverse().slice(0, Math.abs(take));
+          return rows.slice(0, anchor).slice(-Math.abs(take));
         }
         const after = rows.slice(anchor + Math.max(skip, 1));
         return take !== undefined ? after.slice(0, take) : after;
       }
 
       // Emulate Prisma: apply skip, then take; negative take returns the last
-      // rows in reversed (seek) order.
+      // rows, still in sort order.
       let out = rows;
       if (skip > 0) out = out.slice(skip);
       if (take !== undefined) {
-        out = take < 0 ? [...out].reverse().slice(0, Math.abs(take)) : out.slice(0, take);
+        out = take < 0 ? out.slice(-Math.abs(take)) : out.slice(0, take);
       }
       return out;
     },

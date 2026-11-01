@@ -54,8 +54,9 @@ executeWithCursor(): Promise<{ meta: CursorMeta; data: FindResultOf<D, TArgs> }>
 Runs the seek query and trims the over-fetch into a clean page:
 
 - **Rows are always returned in the configured sort order**, regardless of
-  `direction` — a backward page is re-reversed so the UI can render it
-  without special-casing.
+  `direction` — a backward page needs no re-ordering to render
+  (Prisma itself returns negative-`take` rows in `orderBy` order; the extra
+  over-fetch row is trimmed from the far end).
 - `meta.nextCursor` / `meta.prevCursor` are `string | null` and opaque: pass
   them back as `cursor` for the following page. Call it with no cursor to get
   the first page.
