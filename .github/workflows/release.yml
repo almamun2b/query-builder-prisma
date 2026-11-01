@@ -18,9 +18,11 @@ name: Release
 # deterministic per commit range, so a re-run never double-publishes.
 #
 # Version 1.0.0 is burned: it was mis-released, then unpublished, and npm never
-# re-allows an unpublished version. If a BREAKING CHANGE ever makes this run
-# compute 1.0.0 (E400 "Cannot publish over previously published version"),
-# push a fence tag on the commit BEFORE the breaking one
+# re-allows an unpublished version. While pre-1.0, .releaserc.json remaps
+# breaking commits to minor (SemVer 0.x may change behavior in minors), so this
+# run computes 1.0.0 only if that releaseRules entry is removed first. If it
+# ever does (E400 "Cannot publish over previously published version"), push a
+# fence tag on the commit BEFORE the breaking one
 # (`git push origin <breaking-commit>~1:refs/tags/v1.0.0`) and re-run this
 # workflow (workflow_dispatch) — it then releases 2.0.0.
 

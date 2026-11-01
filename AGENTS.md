@@ -40,6 +40,11 @@ version`). And if a future `feat!:`/`BREAKING CHANGE:` makes the bot compute
   `1.0.0`, it fails the same way: push a fence tag on the commit _before_ the
   breaking one (`git push origin <breaking-commit>~1:refs/tags/v1.0.0`), then
   re-run the Release workflow via `workflow_dispatch` — it publishes `2.0.0`.
+  Until then, `.releaserc.json` remaps breaking commits to **minor**
+  (`releaseRules`) because SemVer allows behavior changes in 0.x minors:
+  a breaking batch releases as 0.x, never as the burned `1.0.0`. Remove that
+  `releaseRules` entry when the first post-stable breaking change ships, and
+  follow the fence recovery above.
 
 No Prisma install or database is ever required. All tests use hand-written fake
 delegates (`test/helpers/fake-delegate.ts`) — this is deliberate: the suite
