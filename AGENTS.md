@@ -31,6 +31,15 @@ product's entire moat — every rule below protects it.
   release. Never run `npm publish` or `npm version` by hand. `main` is protected
   (PR-only), so the release bot commits nothing back: the latest `v*` tag / npm
   is the current version and `package.json` on `main` is not bumped.
+- The version string `1.0.0` is permanently burned on npm: it was mis-released
+  and then unpublished, and npm never re-allows an unpublished version. Two
+  standing rules follow. Never delete a published `v*` tag — semantic-release
+  reads tags as release history, and with none it computes a first release of
+  `1.0.0`, which npm rejects (`E400 Cannot publish over previously published
+version`). And if a future `feat!:`/`BREAKING CHANGE:` makes the bot compute
+  `1.0.0`, it fails the same way: push a fence tag on the commit _before_ the
+  breaking one (`git push origin <breaking-commit>~1:refs/tags/v1.0.0`), then
+  re-run the Release workflow via `workflow_dispatch` — it publishes `2.0.0`.
 
 No Prisma install or database is ever required. All tests use hand-written fake
 delegates (`test/helpers/fake-delegate.ts`) — this is deliberate: the suite
