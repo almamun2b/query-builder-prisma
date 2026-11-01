@@ -348,27 +348,64 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
   }
 
   /**
+   * Returns an independent copy of this builder: same filters, sorting, pagination, custom args,
+   * projection and cursor settings, sharing no mutable state. Use it to branch one base query
+   * into several (`base.clone().filter(...)`). {@link select}, {@link include} and a
+   * {@link custom} call carrying a projection clone for you.
+   */
+  clone(): QueryBuilder<D, TArgs> {
+    const copy = new QueryBuilder<D, TArgs>(this.delegate, {
+      dialect: this.dialect,
+      strictNumbers: this.strictNumbers,
+    });
+    copy.andConditions.push(...this.andConditions);
+    copy.customArgs = { ...this.customArgs };
+    copy.customWhere = this.customWhere;
+    copy.customSelect = this.customSelect;
+    copy.customInclude = this.customInclude;
+    copy.orderByArg = this.orderByArg;
+    copy.selectArg = this.selectArg;
+    copy.includeArg = this.includeArg;
+    copy.page = this.page;
+    copy.limit = this.limit;
+    copy.cursorActive = this.cursorActive;
+    copy.cursor = this.cursor;
+    copy.cursorLimit = this.cursorLimit;
+    copy.cursorDirection = this.cursorDirection;
+    copy.cursorField = this.cursorField;
+    copy.cursorStrict = this.cursorStrict;
+    return copy;
+  }
+
+  /**
    * Projects fields with Prisma `select`. The result type of `execute()` is
    * narrowed to exactly the selected shape. Clears any active `.include()`.
+   *
+   * Returns a NEW builder (the type changes, so the original must not alias it): keep using
+   * the returned value. The builder you called it on is left untouched.
    */
   select<TSelect extends SelectOf<D>>(
     select: TSelect,
   ): QueryBuilder<D, ExplicitProjection<TArgs> & { select: TSelect }> {
-    this.selectArg = select;
-    this.includeArg = undefined;
-    return this as unknown as QueryBuilder<D, ExplicitProjection<TArgs> & { select: TSelect }>;
+    const next = this.clone();
+    next.selectArg = select;
+    next.includeArg = undefined;
+    return next as unknown as QueryBuilder<D, ExplicitProjection<TArgs> & { select: TSelect }>;
   }
 
   /**
    * Eager-loads relations with Prisma `include`. The result type of `execute()`
    * is widened with the included relations. Clears any active `.select()`.
+   *
+   * Returns a NEW builder, like {@link select}: keep using the returned value.
    */
   include<TInclude extends IncludeOf<D>>(
     include: TInclude,
   ): QueryBuilder<D, ExplicitProjection<TArgs> & { include: TInclude }> {
-    this.includeArg = include;
-    this.selectArg = undefined;
-    return this as unknown as QueryBuilder<D, ExplicitProjection<TArgs> & { include: TInclude }>;
+    const next = this.clone();
+    next.includeArg = include;
+    next.selectArg = undefined;
+    return next as unknown as QueryBuilder<D, ExplicitProjection<TArgs> & { include: TInclude }>;
   }
 
   /**
@@ -379,24 +416,32 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * previous custom `where` — it never replaces them. Successive
    * custom `where`s may nest `{ AND: [...] }` groups; Prisma treats that
    * identically.
+   *
+   * A literal `select`/`include` in `args` also narrows the result type (an explicit
+   * `.select()`/`.include()` still wins). Like {@link select}, a call that carries one returns a
+   * NEW builder because the type changes; any other call mutates and returns `this`.
    */
   custom<C extends FindManyArgsOf<D>>(args: C): QueryBuilder<D, WithCustom<TArgs, C>> {
     const { where, select, include, ...rest } = args as Record<string, unknown>;
-    this.customArgs = { ...this.customArgs, ...deepStripUndefined(rest) };
+    const hasProjection =
+      (select !== undefined && select !== null) || (include !== undefined && include !== null);
+    const target = hasProjection ? this.clone() : this;
+
+    target.customArgs = { ...target.customArgs, ...deepStripUndefined(rest) };
     if (select !== undefined && select !== null) {
-      this.customSelect = deepStripUndefined(select as Record<string, unknown>);
+      target.customSelect = deepStripUndefined(select as Record<string, unknown>);
     }
     if (include !== undefined && include !== null) {
-      this.customInclude = deepStripUndefined(include as Record<string, unknown>);
+      target.customInclude = deepStripUndefined(include as Record<string, unknown>);
     }
     if (where !== undefined) {
       const cleaned = isPlainObject(where) ? deepStripUndefined(where) : where;
       const hasKeys = !isPlainObject(cleaned) || Object.keys(cleaned).length > 0;
       if (hasKeys) {
-        this.customWhere = combineAnd([cleaned as object], this.customWhere);
+        target.customWhere = combineAnd([cleaned as object], target.customWhere);
       }
     }
-    return this as unknown as QueryBuilder<D, WithCustom<TArgs, C>>;
+    return target as unknown as QueryBuilder<D, WithCustom<TArgs, C>>;
   }
 
   /** The fully assembled `findMany` args. Useful for debugging or reuse. */

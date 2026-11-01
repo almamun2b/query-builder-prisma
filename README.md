@@ -216,7 +216,11 @@ Semantics you can build on (the tests pin these):
 - **`cursorField`** — must be unique and sequentially ordered (pair it with a
   matching `.sortBy()`); duplicates paginate wrong silently.
 - **One builder per query** — instances are cheap; never share one across
-  concurrent requests. Framework recipes: [docs/framework-recipes.md](./docs/framework-recipes.md).
+  concurrent requests. `.select()`, `.include()` and a `.custom()` call that
+  carries a `select`/`include` change the result type, so they return a **new,
+  independent builder** (the one you called them on is untouched - always use
+  the returned value); `clone()` branches a base query explicitly. Every other
+  chain method mutates and returns the same builder. Framework recipes: [docs/framework-recipes.md](./docs/framework-recipes.md).
 - **Dialect config** — global config state is shared via `globalThis`, so ESM+CJS
   dual loading sees one config; the per-builder `dialect` option remains the
   recommended path, and unknown names resolve to `'universal'` (name included).
