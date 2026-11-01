@@ -140,8 +140,14 @@ Names of the built-in dialects — the keys of
 
 ```ts
 type Dialect =
-  | 'postgresql' | 'cockroachdb' | 'mysql' | 'mariadb'
-  | 'sqlite' | 'sqlserver' | 'mongodb' | 'universal';
+  | 'postgresql'
+  | 'cockroachdb'
+  | 'mysql'
+  | 'mariadb'
+  | 'sqlite'
+  | 'sqlserver'
+  | 'mongodb'
+  | 'universal';
 ```
 
 ### `ResolvedDialect`
@@ -213,7 +219,9 @@ The model's `orderBy` input, and the single keys it accepts.
 type OrderByOf<D extends PrismaModelDelegate> = NonNullable<FindManyArgsOf<D>['orderBy']>;
 type OrderKeyOf<D extends PrismaModelDelegate> =
   OrderByOf<D> extends infer O
-    ? O extends readonly unknown[] ? keyof O[number] & string : keyof O & string
+    ? O extends readonly unknown[]
+      ? keyof O[number] & string
+      : keyof O & string
     : never;
 ```
 
@@ -223,14 +231,15 @@ The rows array `findMany` resolves to, and a single row of it.
 
 ```ts
 type RowsOf<D extends PrismaModelDelegate> = Awaited<ReturnType<D['findMany']>>;
-type RowElementOf<D extends PrismaModelDelegate> = RowsOf<D> extends readonly (infer E)[] ? E : never;
+type RowElementOf<D extends PrismaModelDelegate> =
+  RowsOf<D> extends readonly (infer E)[] ? E : never;
 ```
 
 ## Projection engine
 
 The compile-time engine that narrows results like Prisma's own overloads
 (see [Projections](../guides/projections.md)). Degradation rule: when Prisma's
-exact semantics can't be mirrored, the result is the *wider but correct* type.
+exact semantics can't be mirrored, the result is the _wider but correct_ type.
 
 ### `ApplySelect`
 

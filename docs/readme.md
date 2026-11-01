@@ -8,39 +8,39 @@ upgrade can never break your build.
 
 ## Start here
 
-| Document                                   | What it covers                                                            |
-| ------------------------------------------ | ------------------------------------------------------------------------- |
-| [Getting started](./getting-started.md)     | Install, requirements, first query, ESM/CJS/Deno imports                  |
-| [README](../README.md)                      | Feature tour, behavior contracts, known limitations                       |
+| Document                                | What it covers                                           |
+| --------------------------------------- | -------------------------------------------------------- |
+| [Getting started](./getting-started.md) | Install, requirements, first query, ESM/CJS/Deno imports |
+| [README](../README.md)                  | Feature tour, behavior contracts, known limitations      |
 
 ## Guides
 
 Task-oriented, in the order you typically need them:
 
-| Guide                                                | What it covers                                                              |
-| ---------------------------------------------------- | --------------------------------------------------------------------------- |
-| [Filtering and search](./guides/filtering.md)         | `search`, `filter`, `range`, `where` — and how conditions AND-merge          |
-| [Sorting](./guides/sorting.md)                        | `sortBy` vs `orderBy`, dot paths, precedence                                |
-| [Offset pagination](./guides/pagination.md)           | `paginate` + `executeWithMeta`, clamping, `strictNumbers`, `includeTotal`    |
-| [Cursor pagination](./guides/cursor-pagination.md)    | `cursorPaginate` + `executeWithCursor`, directions, strict mode, cursors     |
-| [Projections (select/include)](./guides/projections.md)| Type narrowing without Prisma types, nested includes, the `_count` gap       |
-| [Dialects](./guides/dialects.md)                      | Per-database capabilities, resolution order, custom dialects                 |
-| [Advanced patterns](./guides/advanced.md)             | `custom()`, `initialArgs` seeding, safety hardening, concurrency rules       |
+| Guide                                                   | What it covers                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [Filtering and search](./guides/filtering.md)           | `search`, `filter`, `range`, `where` — and how conditions AND-merge       |
+| [Sorting](./guides/sorting.md)                          | `sortBy` vs `orderBy`, dot paths, precedence                              |
+| [Offset pagination](./guides/pagination.md)             | `paginate` + `executeWithMeta`, clamping, `strictNumbers`, `includeTotal` |
+| [Cursor pagination](./guides/cursor-pagination.md)      | `cursorPaginate` + `executeWithCursor`, directions, strict mode, cursors  |
+| [Projections (select/include)](./guides/projections.md) | Type narrowing without Prisma types, nested includes, the `_count` gap    |
+| [Dialects](./guides/dialects.md)                        | Per-database capabilities, resolution order, custom dialects              |
+| [Advanced patterns](./guides/advanced.md)               | `custom()`, `initialArgs` seeding, safety hardening, concurrency rules    |
 
 ## API reference
 
-| Reference                                  | What it covers                                                            |
-| ------------------------------------------ | ------------------------------------------------------------------------- |
-| [QueryBuilder class](./api/query-builder.md)| Every method: signature, parameters, returns, throws, examples             |
-| [Types](./api/types.md)                     | All exported types — options, meta, dialect, structural extractors         |
-| [Functions](./api/functions.md)             | Dialect configuration functions, `DIALECT_CAPABILITIES`, `NoResultError`    |
+| Reference                                    | What it covers                                                           |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| [QueryBuilder class](./api/query-builder.md) | Every method: signature, parameters, returns, throws, examples           |
+| [Types](./api/types.md)                      | All exported types — options, meta, dialect, structural extractors       |
+| [Functions](./api/functions.md)              | Dialect configuration functions, `DIALECT_CAPABILITIES`, `NoResultError` |
 
 ## Examples
 
-| Document                                    | What it covers                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------------- |
-| [Use cases](./examples/use-cases.md)         | End-to-end scenarios: admin tables, infinite scroll, soft delete, …        |
-| [Framework recipes](./framework-recipes.md)  | Next.js, NestJS, Express, edge runtimes wiring                            |
+| Document                                    | What it covers                                                      |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| [Use cases](./examples/use-cases.md)        | End-to-end scenarios: admin tables, infinite scroll, soft delete, … |
+| [Framework recipes](./framework-recipes.md) | Next.js, NestJS, Express, edge runtimes wiring                      |
 
 ## Reading paths
 

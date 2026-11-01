@@ -6,9 +6,7 @@ from Prisma, computed from your delegate's own types without importing any
 Prisma type.
 
 ```ts
-const users = await new QueryBuilder(prisma.user)
-  .select({ id: true, email: true })
-  .execute();
+const users = await new QueryBuilder(prisma.user).select({ id: true, email: true }).execute();
 // users: { id: string; email: string }[]
 ```
 
@@ -81,7 +79,7 @@ Mixing `include` with an inner `select` projects the inner relation:
 `_count: true` widens the result type with `_count: Record<string, number>` —
 present and correct at runtime, but the statically-known relation keys are
 wider than Prisma's exact per-relation shape. This is the deliberate
-*wider-but-never-wrong* degradation:
+_wider-but-never-wrong_ degradation:
 
 ```ts
 .include({ posts: true, _count: true })

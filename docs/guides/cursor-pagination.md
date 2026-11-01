@@ -1,6 +1,6 @@
 # Cursor pagination
 
-Cursor ("seek") pagination fetches the rows *after* (or before) a reference
+Cursor ("seek") pagination fetches the rows _after_ (or before) a reference
 row instead of skipping a computed offset. It stays fast on deep pages,
 doesn't skip or duplicate rows when data shifts between requests, and is the
 right model for infinite scroll, feeds, chats and any "load more" UI.
@@ -34,13 +34,13 @@ cursorPaginate(params: {
 }): this
 ```
 
-| Parameter     | Meaning                                                                                                             |
-| ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `cursor`      | Value of `cursorField` from the edge row of the previous page. Omit it for the first page.                           |
-| `limit`       | Page size, clamped like [offset pagination](./pagination.md#clamping-and-limits). Default 10.                        |
-| `direction`   | `'forward'` walks toward later rows, `'backward'` toward earlier ones. Output order is unaffected (see below).        |
-| `cursorField` | The unique, sequential column to seek on. Default `'id'`. Pair it with a matching sort.                              |
-| `strict`      | Spend one extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact (see [Strict mode](#strict-mode)).        |
+| Parameter     | Meaning                                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------------------- |
+| `cursor`      | Value of `cursorField` from the edge row of the previous page. Omit it for the first page.                     |
+| `limit`       | Page size, clamped like [offset pagination](./pagination.md#clamping-and-limits). Default 10.                  |
+| `direction`   | `'forward'` walks toward later rows, `'backward'` toward earlier ones. Output order is unaffected (see below). |
+| `cursorField` | The unique, sequential column to seek on. Default `'id'`. Pair it with a matching sort.                        |
+| `strict`      | Spend one extra 1-row probe query to make `hasNextPage`/`hasPrevPage` exact (see [Strict mode](#strict-mode)). |
 
 Cursor mode **wins over offset mode** when both `.paginate()` and
 `.cursorPaginate()` are configured.
@@ -131,7 +131,7 @@ query count.
   ```
 
 - **Plain `.execute()` after `.cursorPaginate()`** returns raw seek-order rows
-  *including* the one-row over-fetch — that is the documented passthrough
+  _including_ the one-row over-fetch — that is the documented passthrough
   behavior for `buildArgs()`-style use. Always use `.executeWithCursor()` for
   trimmed, sort-ordered pages. See
   [Known limitations](../../README.md#known-limitations).
