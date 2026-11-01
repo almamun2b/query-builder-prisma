@@ -10,7 +10,7 @@ describe('stripUndefined', () => {
   it('removes undefined values', () => {
     expect(stripUndefined({ a: 1, b: undefined, c: 'x' })).toEqual({ a: 1, c: 'x' });
   });
-  it('refuses dangerous keys instead of writing them (audit F16)', () => {
+  it('refuses dangerous keys instead of writing them', () => {
     const input = { a: 1, ['__proto__']: { evil: true }, constructor: 2, prototype: 3 };
     const result = stripUndefined(input);
     expect(result).toEqual({ a: 1 });
@@ -18,7 +18,7 @@ describe('stripUndefined', () => {
   });
 });
 
-describe('deepStripUndefined (audit F15)', () => {
+describe('deepStripUndefined', () => {
   it('strips undefined at any depth without mutating the input', () => {
     const input = { a: 1, b: undefined, c: { d: undefined, e: 2 }, f: [{ g: undefined, h: 3 }] };
     const result = deepStripUndefined(input);
@@ -33,7 +33,7 @@ describe('deepStripUndefined (audit F15)', () => {
     expect(result.n).toBe(BigInt(1));
     expect(result.b).toBeUndefined();
   });
-  it('refuses dangerous keys at any depth (audit F16)', () => {
+  it('refuses dangerous keys at any depth', () => {
     const result = deepStripUndefined({ safe: 1, ['__proto__']: { evil: true } });
     expect(result).toEqual({ safe: 1 });
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
@@ -47,13 +47,13 @@ describe('expandDotPath', () => {
   it('expands deep paths', () => {
     expect(expandDotPath('a.b.c', { v: 1 })).toEqual({ a: { b: { c: { v: 1 } } } });
   });
-  it('accepts any leaf value (audit F6)', () => {
+  it('accepts any leaf value', () => {
     expect(expandDotPath('avatar.size', 'desc')).toEqual({ avatar: { size: 'desc' } });
   });
   it('skips empty segments', () => {
     expect(expandDotPath('a..b', 1)).toEqual({ a: { b: 1 } });
   });
-  it('refuses dangerous path segments (audit F16)', () => {
+  it('refuses dangerous path segments', () => {
     expect(expandDotPath('a.__proto__.b', 1)).toEqual({});
     expect(expandDotPath('__proto__', 1)).toEqual({});
     expect(expandDotPath('a.constructor', 1)).toEqual({});

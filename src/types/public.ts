@@ -25,7 +25,7 @@ export interface PaginationMeta {
 
 /**
  * Metadata shape when `executeWithMeta({ includeTotal: false })` skips the
- * `COUNT` query — the totals are unknown, not zero (audit G3).
+ * `COUNT` query — the totals are unknown, not zero.
  */
 export interface PaginationMetaNoTotal {
   page: number;

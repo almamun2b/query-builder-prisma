@@ -16,7 +16,7 @@ The attack surface is intentionally small, and worth keeping that way:
 - **No SQL or command construction** — every argument is passed to Prisma's
   parameterized engine; this package only assembles plain objects.
 - **No network, filesystem, or process APIs in `src/`** (edge-safe by
-  construction — verified by grep in the audit).
+  construction — verified by grep).
 - **Publish hygiene** — the npm tarball contains exactly `dist/`,
   `README.md`, `LICENSE`, `package.json`; the `release-gate` agent verifies
   this on every release.

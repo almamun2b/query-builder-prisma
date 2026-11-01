@@ -27,7 +27,7 @@ export type ApplySelect<Row, S> = {
 /**
  * Apply an `include` spec to a row: all base fields stay, included relations are
  * projected (recursively when the include carries a nested `select`), and a
- * truthy `_count` widens in as `Record<string, number>` (audit F9 — the engine
+ * truthy `_count` widens in as `Record<string, number>` (the engine
  * cannot know the selected relation keys, so it degrades wide, never wrong).
  */
 export type ApplyInclude<Row, I> = Row & {
@@ -50,27 +50,23 @@ type ProjectField<Field, Spec> = Spec extends true
  * Lists map over their element; optionality (`| null | undefined`) is preserved
  * exactly.
  */
-type ProjectNested<Field, Sub> =
-  Field extends readonly (infer E)[]
-    ? ApplySelect<E, Sub>[]
-    :
-        | ApplySelect<NonNullable<Field>, Sub>
-        | (undefined extends Field ? undefined : never)
-        | (null extends Field ? null : never);
+type ProjectNested<Field, Sub> = Field extends readonly (infer E)[]
+  ? ApplySelect<E, Sub>[]
+  : | ApplySelect<NonNullable<Field>, Sub>
+    | (undefined extends Field ? undefined : never)
+    | (null extends Field ? null : never);
 
 /**
  * Project a relation field through an `include`. Unlike select, include keeps
  * the relation's own fields — the element is intersected with its projection
- * via `ApplyInclude` (audit F3). Lists map over their element; optionality is
+ * via `ApplyInclude`. Lists map over their element; optionality is
  * preserved exactly.
  */
-type ProjectNestedInclude<Field, Sub> =
-  Field extends readonly (infer E)[]
-    ? ApplyInclude<E, Sub>[]
-    :
-        | ApplyInclude<NonNullable<Field>, Sub>
-        | (undefined extends Field ? undefined : never)
-        | (null extends Field ? null : never);
+type ProjectNestedInclude<Field, Sub> = Field extends readonly (infer E)[]
+  ? ApplyInclude<E, Sub>[]
+  : | ApplyInclude<NonNullable<Field>, Sub>
+    | (undefined extends Field ? undefined : never)
+    | (null extends Field ? null : never);
 
 /**
  * The row shape produced by a `findMany` call with the given accumulated args.

@@ -6,7 +6,7 @@ import type { CursorDirection, CursorMeta, PaginationMeta } from '../types/publi
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_PAGE_SIZE = 1000;
-/** Upper bound for offset `skip` so deep pages cannot hit the DB unbounded (audit F18). */
+/** Upper bound for offset `skip` so deep pages cannot hit the DB unbounded. */
 export const MAX_SKIP = 100_000;
 
 /** Clamp a page size to `[1, MAX_PAGE_SIZE]`; non-finite input gets the default. */
@@ -50,7 +50,7 @@ export function buildPaginationMeta(total: number, page: number, limit: number):
 
 /**
  * Serialize one cursor value. Dates become ISO-8601 strings so cursors are
- * round-trippable and locale/TZ-independent (audit F4); everything else uses
+ * round-trippable and locale/TZ-independent; everything else uses
  * plain string coercion.
  */
 export function serializeCursorValue(value: unknown): string {
@@ -90,7 +90,7 @@ export function toCursorArgs(plan: CursorPlan): {
   };
 }
 
-/** Exact edge flags from a strict-mode probe query (audit F10). */
+/** Exact edge flags from a strict-mode probe query. */
 export interface ExactCursorFlags {
   hasNextPage?: boolean | undefined;
   hasPrevPage?: boolean | undefined;
@@ -105,7 +105,7 @@ export interface CursorPageInfo {
   hadCursor: boolean;
   /**
    * Probe-derived flags (strict mode); each entry replaces the optimistic
-   * approximation for that edge (audit F10 / G9).
+   * approximation for that edge.
    */
   exactFlags?: ExactCursorFlags | undefined;
 }

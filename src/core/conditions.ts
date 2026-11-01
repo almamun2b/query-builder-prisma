@@ -3,7 +3,7 @@
 /**
  * Keys we refuse to write into objects we build: computed-key assignment on
  * `'__proto__'` would set a local prototype instead of an own property
- * (audit F16 — reachable via JSON-parsed request bodies).
+ * (reachable via JSON-parsed request bodies).
  */
 const DANGEROUS_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -27,7 +27,7 @@ export function stripUndefined(obj: Record<string, unknown>): Record<string, unk
  * objects without `undefined` values at any depth. Values that are not plain
  * objects (Date, BigInt, class instances like Decimal) pass through untouched
  * and the input is never mutated. Used by `.custom()` so a later
- * `custom({ key: undefined })` cannot overwrite an earlier value (audit F15).
+ * `custom({ key: undefined })` cannot overwrite an earlier value.
  */
 export function deepStripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -61,7 +61,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
 /**
  * Expand `'avatar.size'` + a leaf value into `{ avatar: { size: leaf } }`.
  * Empty segments are skipped; a path containing a `__proto__`/`constructor`/
- * `prototype` segment expands to `{}` — refused, never written (audit F16).
+ * `prototype` segment expands to `{}` — refused, never written.
  */
 export function expandDotPath(path: string, leaf: unknown): Record<string, unknown> {
   const keys = path.split('.').filter((key) => key.length > 0);

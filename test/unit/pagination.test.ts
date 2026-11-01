@@ -30,7 +30,7 @@ describe('toOffsetArgs', () => {
     expect(args.page).toBe(1);
     expect(args.limit).toBe(1);
   });
-  it('caps skip at MAX_SKIP (audit F18)', () => {
+  it('caps skip at MAX_SKIP', () => {
     expect(toOffsetArgs(1e9, 1000).skip).toBe(MAX_SKIP);
     expect(MAX_SKIP).toBe(100_000);
   });
@@ -47,7 +47,7 @@ describe('buildPaginationMeta', () => {
   });
 });
 
-describe('serializeCursorValue (audit F4)', () => {
+describe('serializeCursorValue', () => {
   it('serializes Dates as ISO-8601 and round-trips', () => {
     const date = new Date('2026-01-01T06:00:09.000Z');
     const cursor = serializeCursorValue(date);
@@ -74,7 +74,7 @@ describe('toCursorArgs', () => {
       skip: 1,
     });
   });
-  it('passes number and Date cursors through raw (audit F4)', () => {
+  it('passes number and Date cursors through raw', () => {
     const date = new Date('2026-01-01T00:00:00.000Z');
     expect(toCursorArgs({ cursorField: 'n', cursor: 7 }).cursor).toEqual({ n: 7 });
     expect(toCursorArgs({ cursorField: 'at', cursor: date }).cursor).toEqual({ at: date });
@@ -124,7 +124,7 @@ describe('buildCursorPage', () => {
     expect(meta.hasPrevPage).toBe(true);
   });
 
-  it('serializes Date cursor fields to ISO strings (audit F4)', () => {
+  it('serializes Date cursor fields to ISO strings', () => {
     const rows = [
       { id: 'a', at: new Date('2026-01-01T06:00:09.000Z') },
       { id: 'b', at: new Date('2026-02-01T06:00:09.000Z') },
@@ -139,7 +139,7 @@ describe('buildCursorPage', () => {
     expect(meta.nextCursor).toBe('2026-01-01T06:00:09.000Z');
   });
 
-  it('a probe-derived flag overrides the optimistic one (audit F10)', () => {
+  it('a probe-derived flag overrides the optimistic one', () => {
     const rows = [mk(1), mk(2)];
     const { meta } = buildCursorPage(rows, {
       limit: 10,
@@ -152,7 +152,7 @@ describe('buildCursorPage', () => {
     expect(meta.hasNextPage).toBe(false);
   });
 
-  it('fixes the empty-page hasPrevPage edge (audit G9)', () => {
+  it('fixes the empty-page hasPrevPage edge', () => {
     const { meta } = buildCursorPage([], {
       limit: 10,
       direction: 'forward',

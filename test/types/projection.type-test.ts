@@ -72,9 +72,8 @@ interface UserDelegate extends PrismaModelDelegate {
 declare const userDelegate: UserDelegate;
 
 // --- strict type-equality helpers (verified by `npm run typecheck`) ---
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
-  ? true
-  : false;
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Expect<T extends true> = T;
 
 // no projection => full row type
@@ -96,9 +95,7 @@ const _3: Expect<Equal<Awaited<typeof _nested>, { id: string; posts: { title: st
 const _included = new QueryBuilder(userDelegate)
   .include({ posts: { select: { id: true } } })
   .execute();
-const _4: Expect<
-  Equal<Awaited<typeof _included>, (User & { posts: { id: string }[] })[]>
-> = true;
+const _4: Expect<Equal<Awaited<typeof _included>, (User & { posts: { id: string }[] })[]>> = true;
 
 // nullable field selection keeps nullability
 const _withName = new QueryBuilder(userDelegate).select({ id: true, name: true }).execute();
@@ -108,7 +105,7 @@ const _5: Expect<Equal<Awaited<typeof _withName>, { id: string; name: string | n
 type Direct = FindResultOf<UserDelegate, { select: { id: true; email: true } }>;
 const _6: Expect<Equal<Direct, { id: string; email: string }[]>> = true;
 
-// --- nested include keeps the relation's own fields (audit F3 regression) ---
+// --- nested include keeps the relation's own fields ---
 
 // nested include: base fields survive on every level
 const _nestedInclude = new QueryBuilder(userDelegate)
@@ -145,7 +142,7 @@ const _flatNullable = new QueryBuilder(userDelegate).include({ profile: true }).
 const _10: Expect<Equal<Awaited<typeof _flatNullable>, (User & { profile: Profile | null })[]>> =
   true;
 
-// --- `_count` include widens in (audit F9 regression) ---
+// --- `_count` include widens in ---
 
 // `_count: true` alongside a relation include: the count record is typed wide
 const _countInclude = new QueryBuilder(userDelegate)

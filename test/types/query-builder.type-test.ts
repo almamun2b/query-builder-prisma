@@ -26,7 +26,7 @@ type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Expect<T extends true> = T;
 
-// --- executeWithMeta meta types (audit G3) ---
+// --- executeWithMeta meta types ---
 
 // default call: meta keeps the exact PaginationMeta shape (no widening)
 const _metaDefault = new QueryBuilder(userDelegate).executeWithMeta();
@@ -40,7 +40,7 @@ const _m2: Expect<Equal<Awaited<typeof _metaNoTotal>['meta'], PaginationMetaNoTo
 const _metaTotal = new QueryBuilder(userDelegate).executeWithMeta({ includeTotal: true });
 const _m3: Expect<Equal<Awaited<typeof _metaTotal>['meta'], PaginationMeta>> = true;
 
-// --- multi-key orderBy (audit G1) ---
+// --- multi-key orderBy ---
 
 // array orderBy is accepted verbatim from the derived OrderByOf
 new QueryBuilder(userDelegate).orderBy([{ id: 'asc' }, { email: 'desc' }]);

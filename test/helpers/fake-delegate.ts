@@ -23,7 +23,7 @@ export interface FakeFindArgs {
 
 export interface RecordedArgs {
   findManyArgs?: FakeFindArgs;
-  /** Every `findMany` call in order — strict cursor mode issues a probe call (audit F10). */
+  /** Every `findMany` call in order — strict cursor mode issues a probe call. */
   findManyCalls: (FakeFindArgs | undefined)[];
   countArgs?: Record<string, unknown>;
 }
@@ -40,7 +40,7 @@ export function fakeRows(n: number): FakeRow[] {
 /**
  * Cursor-cell match with Prisma's DateTime coercion: ISO strings are accepted
  * for Date cells (this is what makes serialized cursors round-trippable — the
- * exact property audit F4 guarantees).
+ * exact property cursor serialization guarantees).
  */
 function matchesCursorCell(row: FakeRow, field: string, value: unknown): boolean {
   const cell: unknown = (row as unknown as Record<string, unknown>)[field];
