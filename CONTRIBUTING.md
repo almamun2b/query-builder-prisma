@@ -1,7 +1,7 @@
 # Contributing
 
 Short version: **`npm run verify` green = the bar.** It runs lint → typecheck →
-test → build, the same gate CI runs on Node 18/20/24. A change is not done until
+test → build, the same gate CI runs on Node 22/24. A change is not done until
 it is green, with **zero Prisma installed and no database running** — that is
 the standing proof of the zero-coupling design, not an accident.
 
@@ -51,7 +51,7 @@ the README "Behavior contracts" section in the same change.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) —
 they are what semantic-release parses on `main` to pick the next version, and
-the format is enforced by commitlint:
+the format is enforced locally by commitlint:
 
 ```text
 type(scope)?: subject        e.g. fix: strip undefined where keys
@@ -65,10 +65,12 @@ feat!: / BREAKING CHANGE:    for breaking changes
 | `feat!:` or `BREAKING CHANGE:` footer | major                              |
 | `docs:`, `chore:`, `ci:`, `test:`, …  | no release                         |
 
-Enforcement is two-layered: a husky `commit-msg` hook (installed automatically
-by the `prepare` script) rejects bad messages at commit time, and a CI job
-re-checks every PR and push to `main` — a `--no-verify` bypass is caught at CI,
-not by npm. Scope is free-form (`feat(dialects): …`); the type is what matters.
+Enforcement is local: husky hooks (installed automatically by the `prepare`
+script) run Prettier, typecheck and lint on `pre-commit`, commitlint on
+`commit-msg`, and the unit tests on `pre-push`. GitHub CI re-runs lint,
+typecheck, test and build. A `--no-verify` bypass of the message check is not
+caught in GitHub — semantic-release simply ignores a non-conventional commit.
+Scope is free-form (`feat(dialects): …`); the type is what matters.
 
 ## Releases
 
