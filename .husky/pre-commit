@@ -1,0 +1,22 @@
+# Local quality gate (runs on every commit; CI re-runs lint/typecheck/test/build).
+
+# 1. Identity guard: commits must never be authored or committed as Claude.
+for ident in "$(git var GIT_AUTHOR_IDENT)" "$(git var GIT_COMMITTER_IDENT)"; do
+  case "$ident" in
+    "Claude <"* | *"@anthropic.com>"*)
+      echo "pre-commit: refusing to commit as Claude/Anthropic ($ident)." >&2
+      echo "Use the owner's identity, e.g. git -c user.name=... -c user.email=... commit" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# 2. Prettier on staged files only.
+if [ -n "$(git diff --cached --name-only --diff-filter=ACMR)" ]; then
+  git diff --cached --name-only --diff-filter=ACMR -z |
+    xargs -0 npx --no -- prettier --check --ignore-unknown
+fi
+
+# 3. Types, then lint.
+npm run --silent typecheck
+npm run --silent lint
