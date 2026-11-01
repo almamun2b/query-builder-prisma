@@ -75,7 +75,7 @@ runtime dependencies.
 - **Dialect capability registry** — `mode: 'insensitive'` only where Prisma
   accepts it; new databases are one `registerDialect()` call.
 - **Hardened by default** — `undefined` stripping at any depth, prototype-key
-  refusal (a thrown error, never a silent drop), clamped (or thrown) pagination numbers, a seed `where` that cannot
+  refusal, clamped (or thrown) pagination numbers, a seed `where` that cannot
   be replaced.
 
 ### Offsetting and counting
@@ -145,11 +145,8 @@ Semantics you can build on (the tests pin these):
   it never replaces them.
 - **`custom()` strips `undefined`** — at any depth, so
   `custom({ distinct: undefined })` cannot overwrite an earlier value. Keys
-  named `__proto__`, `constructor` or `prototype` **throw** (`Refused key "…"`)
-  in `custom()`, `filter()`, `where()` and dot-path expansion (`range`,
-  `sortBy`) - they are never written and never silently dropped, because
-  dropping a filter would widen the query. Empty input (`sortBy: ''`, empty
-  `searchText`, `fields: []`) stays a documented no-op.
+  named `__proto__`, `constructor` or `prototype` are refused (never written)
+  in `custom()`, `filter()` and dot-path expansion.
 - **Sorting** — `.sortBy()` is single-key sugar and expands dot paths like
   `.range()` (`'avatar.size'` → `{ avatar: { size: 'desc' } }`); `.orderBy()`
   takes the full Prisma shape verbatim (arrays for multi-key, nested relation
@@ -216,11 +213,7 @@ Semantics you can build on (the tests pin these):
 - **`cursorField`** — must be unique and sequentially ordered (pair it with a
   matching `.sortBy()`); duplicates paginate wrong silently.
 - **One builder per query** — instances are cheap; never share one across
-  concurrent requests. `.select()`, `.include()` and a `.custom()` call that
-  carries a `select`/`include` change the result type, so they return a **new,
-  independent builder** (the one you called them on is untouched - always use
-  the returned value); `clone()` branches a base query explicitly. Every other
-  chain method mutates and returns the same builder. Framework recipes: [docs/framework-recipes.md](./docs/framework-recipes.md).
+  concurrent requests. Framework recipes: [docs/framework-recipes.md](./docs/framework-recipes.md).
 - **Dialect config** — global config state is shared via `globalThis`, so ESM+CJS
   dual loading sees one config; the per-builder `dialect` option remains the
   recommended path, and unknown names resolve to `'universal'` (name included).

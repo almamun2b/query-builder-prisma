@@ -1,27 +1,21 @@
 /** Build-time condition assembly helpers used by the QueryBuilder core. */
 
 /**
- * Keys we refuse to build into queries: assigning `'__proto__'` would set a prototype instead of
- * an own property (reachable via JSON-parsed request bodies). A refused key THROWS - silently
- * dropping it would turn a restricted query into a wider one.
+ * Keys we refuse to write into objects we build: computed-key assignment on
+ * `'__proto__'` would set a local prototype instead of an own property
+ * (reachable via JSON-parsed request bodies).
  */
 const DANGEROUS_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 
-function assertSafeKey(key: string): void {
-  if (DANGEROUS_KEYS.has(key)) {
-    throw new Error(
-      `Refused key "${key}": it can pollute object prototypes. Remove it from the input ` +
-        '(filters, ranges, sort paths and custom args) instead of passing user data through unchecked.',
-    );
-  }
+function isSafeKey(key: string): boolean {
+  return !DANGEROUS_KEYS.has(key);
 }
 
 /** Strip `undefined` values so optional query params can be passed directly. */
 export function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    assertSafeKey(key);
-    if (value !== undefined) {
+    if (value !== undefined && isSafeKey(key)) {
       result[key] = value;
     }
   }
@@ -38,8 +32,7 @@ export function stripUndefined(obj: Record<string, unknown>): Record<string, unk
 export function deepStripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    assertSafeKey(key);
-    if (value === undefined) {
+    if (value === undefined || !isSafeKey(key)) {
       continue;
     }
     result[key] = isDeepStrippable(value)
@@ -67,13 +60,12 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
 
 /**
  * Expand `'avatar.size'` + a leaf value into `{ avatar: { size: leaf } }`.
- * Empty segments are skipped (a path of only empty segments expands to `{}`); a path
- * containing a `__proto__`/`constructor`/`prototype` segment throws.
+ * Empty segments are skipped; a path containing a `__proto__`/`constructor`/
+ * `prototype` segment expands to `{}` — refused, never written.
  */
 export function expandDotPath(path: string, leaf: unknown): Record<string, unknown> {
   const keys = path.split('.').filter((key) => key.length > 0);
-  keys.forEach(assertSafeKey);
-  if (keys.length === 0) {
+  if (keys.length === 0 || keys.some((key) => !isSafeKey(key))) {
     return {};
   }
   let current: unknown = leaf;

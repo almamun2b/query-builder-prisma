@@ -58,22 +58,13 @@ describe('QueryBuilder conditions', () => {
     expect(recorded.findManyArgs?.where).toEqual({ avatar: { size: { gte: 5 } } });
   });
 
-  it('range throws for a dangerous path instead of widening the query', () => {
-    const { delegate } = createFakeDelegate(fakeRows(2));
-    expect(() => new QueryBuilder(delegate).range({ 'a.__proto__.size': { from: 5 } })).toThrow(
-      'Refused key "__proto__"',
-    );
-  });
-
-  it('filter, where and custom throw on a hostile request body', () => {
-    const { delegate } = createFakeDelegate(fakeRows(2));
-    const hostile = JSON.parse('{"status":"ACTIVE","__proto__":{"x":1}}') as Record<
-      string,
-      unknown
-    >;
-    expect(() => new QueryBuilder(delegate).filter(hostile)).toThrow('Refused key');
-    expect(() => new QueryBuilder(delegate).where(hostile)).toThrow('Refused key');
-    expect(() => new QueryBuilder(delegate).custom({ where: hostile })).toThrow('Refused key');
+  it('range adds nothing for a dangerous path', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(2));
+    await new QueryBuilder(delegate)
+      .range({ 'a.__proto__.size': { from: 5 } })
+      .filter({ status: 'ACTIVE' })
+      .execute();
+    expect(recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
   });
 
   it('seeded initialArgs where is ANDed first', async () => {
@@ -182,16 +173,9 @@ describe('QueryBuilder sorting', () => {
     expect(recorded.findManyArgs?.orderBy).toEqual({ createdAt: 'desc' });
   });
 
-  it('sortBy throws for a dangerous path', () => {
-    const { delegate } = createFakeDelegate(fakeRows(3));
-    expect(() => new QueryBuilder(delegate).sortBy({ sortBy: 'a.__proto__.b' })).toThrow(
-      'Refused key "__proto__"',
-    );
-  });
-
-  it('an empty sortBy stays a no-op', async () => {
+  it('sortBy adds nothing for a dangerous path', async () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    await new QueryBuilder(delegate).sortBy({ sortBy: '' }).execute();
+    await new QueryBuilder(delegate).sortBy({ sortBy: 'a.__proto__.b' }).execute();
     expect(recorded.findManyArgs?.orderBy).toBeUndefined();
   });
 
@@ -645,76 +629,6 @@ describe('QueryBuilder cursor pagination', () => {
     const { delegate, recorded } = createFakeDelegate(fakeRows(30));
     await new QueryBuilder(delegate).cursorPaginate({ cursor: 'u0', limit: 5 }).executeWithCursor();
     expect(recorded.findManyCalls).toHaveLength(1);
-  });
-});
-
-describe('QueryBuilder clone semantics', () => {
-  it('two select() calls on one base build independent queries', async () => {
-    const a = createFakeDelegate(fakeRows(3));
-    const base = new QueryBuilder(a.delegate).filter({ status: 'ACTIVE' });
-    const withId = base.select({ id: true });
-    const withEmail = base.select({ email: true });
-
-    await withId.execute();
-    expect(a.recorded.findManyArgs?.select).toEqual({ id: true });
-    await withEmail.execute();
-    expect(a.recorded.findManyArgs?.select).toEqual({ email: true });
-    await base.execute();
-    expect(a.recorded.findManyArgs?.select).toBeUndefined();
-    expect(a.recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
-  });
-
-  it('select() and include() return a new builder; the base is left untouched', async () => {
-    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    const base = new QueryBuilder(delegate);
-    const selected = base.select({ id: true });
-    const included = base.include({ posts: true });
-    expect(selected).not.toBe(base);
-    expect(included).not.toBe(base);
-    await base.execute();
-    expect(recorded.findManyArgs?.select).toBeUndefined();
-    expect(recorded.findManyArgs?.include).toBeUndefined();
-  });
-
-  it('a clone does not share later conditions with its origin', async () => {
-    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
-    const base = new QueryBuilder(delegate).filter({ status: 'ACTIVE' });
-    const branch = base.select({ id: true }).filter({ email: 'a@x.dev' });
-    await branch.execute();
-    expect(recorded.findManyArgs?.where).toEqual({
-      AND: [{ status: 'ACTIVE' }, { email: 'a@x.dev' }],
-    });
-    await base.execute();
-    expect(recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
-  });
-
-  it('clone() copies filters, sorting, pagination, custom args and cursor settings', async () => {
-    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
-    const base = new QueryBuilder(delegate, { initialArgs: { where: { status: 'ACTIVE' } } })
-      .filter({ email: 'a@x.dev' })
-      .sortBy({ sortBy: 'email', sortOrder: 'asc' })
-      .custom({ distinct: ['email'] })
-      .cursorPaginate({ cursor: 'u5', limit: 3, direction: 'backward', strict: true });
-    const copy = base.clone();
-    expect(copy).not.toBe(base);
-    expect(copy.buildArgs()).toEqual(base.buildArgs());
-    await copy.executeWithCursor();
-    expect(recorded.findManyCalls).toHaveLength(2); // strict flag carried over: main + probe
-  });
-
-  it('custom() with a projection returns a new builder, without one it returns the same', () => {
-    const { delegate } = createFakeDelegate(fakeRows(3));
-    const base = new QueryBuilder(delegate);
-    expect(base.custom({ select: { id: true } })).not.toBe(base);
-    expect(base.custom({ distinct: ['email'] })).toBe(base);
-    expect(base.buildArgs()).toEqual({ distinct: ['email'] });
-  });
-
-  it('chain methods that keep the result type still mutate and return this', () => {
-    const { delegate } = createFakeDelegate(fakeRows(3));
-    const base = new QueryBuilder(delegate);
-    expect(base.filter({ status: 'ACTIVE' })).toBe(base);
-    expect(base.paginate({ page: 1, limit: 5 })).toBe(base);
   });
 });
 

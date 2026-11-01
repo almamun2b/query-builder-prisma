@@ -21,4 +21,5 @@ The attack surface is intentionally small, and worth keeping that way:
   `README.md`, `LICENSE`, `package.json`; the `release-gate` agent verifies
   this on every release.
 
-Known hardening items are documented in the README (`Known limitations`).
+Known hardening items (e.g. prototype-key handling in `stripUndefined`) are
+documented in the README (`Known limitations`).
