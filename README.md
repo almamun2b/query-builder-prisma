@@ -231,12 +231,40 @@ regression-tested. Remaining limitations are documented below.
 
 ## Known limitations
 
-Open and documented rather than hidden — none produces a silently wrong result:
+Open and documented rather than hidden. Each says how it fails and what to do instead:
 
 - **Plain `.execute()` after `.cursorPaginate()`** returns raw seek-order rows
   including the one-row over-fetch — use `.executeWithCursor()` for trimmed,
   sort-ordered pages (kept as raw-passthrough semantics by design; the
   `buildArgs()` passthrough is always available).
+- **Strict cursor flags ignore the cursor row itself** — the `strict: true`
+  probe looks for rows strictly before/after the cursor row, so walking
+  backward from the dataset's last row reports `hasNextPage: false` although
+  the cursor row follows that page (and forward from the first row reports
+  `hasPrevPage: false`). The default optimistic flags say `true` in those two
+  cases; at those edges treat them as authoritative.
+- **Some projections are not reflected in the result type** — a `select`/`include`
+  seeded through `initialArgs`, a `custom()` argument held in a wide variable
+  (not a literal), and `custom({ omit | distinct })` still run, but the type
+  stays the full row (it may claim fields the query did not return). Use
+  `.select()`/`.include()`, or the `buildArgs()` passthrough, when the exact
+  shape matters.
+- **Wide types by design** — a relation the delegate's row type does not
+  describe is `unknown`, and `_count` is `Record<string, number>`. They are
+  correct but not precise; `prisma.user.findMany(qb.buildArgs())` gives
+  Prisma's exact shape.
+- **Dot paths reach to-one relations only** — `range()`/`sortBy()` paths into a
+  to-many relation produce `{ posts: { field } }`, which Prisma rejects at
+  runtime (loudly); use `.where({ posts: { some: { … } } })`.
+- **No field allow-list** — `sortBy`, `cursorField` and `range` keys accept any
+  string; validate user-supplied field names yourself (e.g. against a fixed
+  list) before passing them in.
+- **`count()` ignores `distinct`**, so `executeWithMeta()` totals can over-count
+  when `distinct` is set through `custom()`.
+- **Typing edges** — `sortBy` defaults to `desc` (opposite of SQL); with
+  `exactOptionalPropertyTypes` the `paginate`/`sortBy`/`cursorPaginate`
+  parameters do not accept an explicit `undefined`; a custom dialect name needs
+  a cast to satisfy the `dialect` option's built-in union.
 
 ## FAQ
 

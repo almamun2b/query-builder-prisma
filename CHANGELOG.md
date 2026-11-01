@@ -5,6 +5,47 @@ Notable changes to `query-builder-prisma`. Format follows
 over the public surface (`src/index.ts` exports) plus the README behavior
 contracts.
 
+## [Unreleased]
+
+Versions are produced by semantic-release from the commit history; this entry
+summarises the user-visible changes on the way to the next major release.
+
+### Changed — breaking
+
+- **`select()` and `include()` return a new, independent builder** (as does
+  `custom()` when it carries a `select`/`include`). Code that ignored their
+  return value (`qb.select({ … }); await qb.execute()`) must use the returned
+  builder. `clone()` is new and branches a base query explicitly.
+- **A page whose computed `skip` exceeds 100 000 is empty** (`take: 0`, truthful
+  `meta.page`) instead of silently serving the rows at skip 100 000.
+- **Refused keys throw.** `__proto__`, `constructor` and `prototype` in
+  `filter()`, `where()`, `custom()`, `range()` and `sortBy()` raise
+  `Refused key "…"` instead of being dropped (which widened the query).
+
+### Fixed
+
+- Backward cursor pages were wrong against real Prisma (they dropped the row
+  nearest the cursor and reversed the page); verified against a generated
+  Prisma 7 client.
+- `select()` on a builder seeded with an `include` (or vice versa) no longer
+  sends both keys.
+- The strict cursor probe now inherits `where`, `orderBy` and `distinct` from
+  every source, fetches only the cursor field and runs in parallel.
+- `executeWithMeta()` / `executeWithCursor()` no longer change the builder.
+- A cursor field that is missing, `null` or an Invalid Date fails with a message
+  naming the field instead of producing a cursor of `"undefined"`.
+- Types: relations the row type does not describe are `unknown` instead of
+  being dropped, `select({ _count })` is kept, non-literal `boolean` flags make
+  keys optional, `custom({ select | include })` narrows the result, and the
+  `buildArgs()` passthrough infers Prisma's exact result type.
+
+### Added
+
+- `cursorPaginate({ cursorType: 'string' | 'number' | 'bigint' | 'date' })`
+  converts a cursor read back from a query string (Prisma rejects a string for
+  an `Int` cursor field); `cursor` also accepts `bigint`.
+- Exported types: `CursorType`, `CursorValue`, `ProjectionArgs`, `BuiltArgsOf`.
+
 ## [0.2.0] — 2026-10-30
 
 ### Changed
