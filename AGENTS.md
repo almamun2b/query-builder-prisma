@@ -31,20 +31,24 @@ product's entire moat — every rule below protects it.
   release. Never run `npm publish` or `npm version` by hand. `main` is protected
   (PR-only), so the release bot commits nothing back: the latest `v*` tag / npm
   is the current version and `package.json` on `main` is not bumped.
-- The version string `1.0.0` is permanently burned on npm: it was mis-released
-  and then unpublished, and npm never re-allows an unpublished version. Two
-  standing rules follow. Never delete a published `v*` tag — semantic-release
-  reads tags as release history, and with none it computes a first release of
-  `1.0.0`, which npm rejects (`E400 Cannot publish over previously published
-version`). And if a future `feat!:`/`BREAKING CHANGE:` makes the bot compute
-  `1.0.0`, it fails the same way: push a fence tag on the commit _before_ the
-  breaking one (`git push origin <breaking-commit>~1:refs/tags/v1.0.0`), then
-  re-run the Release workflow via `workflow_dispatch` — it publishes `2.0.0`.
-  Until then, `.releaserc.json` remaps breaking commits to **minor**
-  (`releaseRules`) because SemVer allows behavior changes in 0.x minors:
-  a breaking batch releases as 0.x, never as the burned `1.0.0`. Remove that
-  `releaseRules` entry when the first post-stable breaking change ships, and
-  follow the fence recovery above.
+- The 1.x version line is permanently burned on npm: `1.0.0` was mis-released
+  and unpublished on 2026-11-01, and `1.1.0` (published hours later from the
+  pre-revert history) was unpublished the same day — and npm never re-allows an
+  unpublished version string. Two standing rules follow. Never delete a
+  published `v*` tag — semantic-release reads tags as release history, and with
+  none it computes a first release of `1.0.0`, which npm rejects (`E400 Cannot
+publish over previously published version`). And when the library finally
+  leaves 0.x, it must go straight to `2.0.0`: push a fence tag on the commit
+  _before_ the breaking one
+  (`git push origin <breaking-commit>~1:refs/tags/v1.0.0`), then re-run the
+  Release workflow via `workflow_dispatch` — the breaking change from a `v1.0.0`
+  base publishes `2.0.0`. Do not rely on non-breaking commits after the fence:
+  a `feat:` would compute `1.1.0`, which is equally burned. Until then,
+  `.releaserc.json` remaps breaking commits to **minor** (`releaseRules`)
+  because SemVer allows behavior changes in 0.x minors: a breaking batch
+  releases as 0.x, never as a burned 1.x version. Remove that `releaseRules`
+  entry as part of going stable: with the remap active, the 2.0.0 fence path
+  above would itself compute `1.1.0` and fail.
 
 No Prisma install or database is ever required. All tests use hand-written fake
 delegates (`test/helpers/fake-delegate.ts`) — this is deliberate: the suite
