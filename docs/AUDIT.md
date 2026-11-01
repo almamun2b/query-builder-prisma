@@ -179,8 +179,9 @@ can produce a spurious `{ k: never }` member. `ApplySelect` also drops optional/
 
 **TOOL-02 · LOW — unused dev dependencies (applied).** `@types/node` was needed only by `tsconfig` `types: ["node"]`
 (no Node API is used in `src/`, `test/` or the configs); `conventional-commits-filter`/`-parser` were lockfile-resolution
-pins, not direct dependencies; `allowScripts` is not a field npm 10 reads. All four were removed; `npm ci` succeeds on npm
-10.9 and npm 11, and `verify` is green. `@semantic-release/*` plugins are bundled with `semantic-release` and correctly absent.
+pins, not direct dependencies. Those three were removed (the owner also pruned their leftover optional-peer lockfile
+entries); `npm ci` succeeds on npm 10.9 and npm 11, and `verify` is green. `allowScripts` (esbuild) was **retained** by the
+owner: npm 10 ignores it, but newer npm versions read it, so it is not dead config. `@semantic-release/*` plugins are bundled with `semantic-release` and correctly absent.
 
 **TOOL-03 · LOW — TypeScript pinned to 5.9.3 (applied).** Now `~6.0.3`. TypeScript 7.0.2 is npm `latest`, but
 typescript-eslint 8.72.1 peers `typescript <6.1.0`, so 7 would break `npm run lint`; revisit when that range widens.
@@ -218,7 +219,7 @@ Commits on `improvement-code`, all typed so that semantic-release does not publi
 
 | Change                                                                                                         | Finding          |
 | -------------------------------------------------------------------------------------------------------------- | ---------------- |
-| TypeScript `~6.0.3`; unused dev dependencies and `allowScripts` removed; tsup DTS deprecation scoped           | TOOL-02, TOOL-03 |
+| TypeScript `~6.0.3`; three unused dev dependencies removed; tsup DTS deprecation scoped                        | TOOL-02, TOOL-03 |
 | husky `pre-commit` (identity guard, Prettier on staged files, typecheck, lint), `commit-msg`, `pre-push` hooks | TOOL-01          |
 | `format:check` script and `.prettierignore`; one-off repository format                                         | TOOL-01          |
 | `commitlint` CI job removed; `release.yml` untouched                                                           | TOOL-07          |
