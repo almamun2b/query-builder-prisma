@@ -5,12 +5,15 @@ Notable changes to `query-builder-prisma`. Format follows
 over the public surface (`src/index.ts` exports) plus the README behavior
 contracts.
 
-## [Unreleased]
+## [0.3.0] — 2026-11-02
 
 Versions are produced by semantic-release from the commit history; this entry
-summarises the user-visible changes on the way to the next major release.
+summarises the changes in 0.3.0. The same content was first cut as 1.0.0 —
+the version number was wrong, so the npm release was unpublished, the tag
+retired, and the range re-released as a 0.x minor (`^0.2.x` ranges do not
+auto-install it).
 
-### Changed — breaking
+### Changed
 
 - **`select()` and `include()` return a new, independent builder** (as does
   `custom()` when it carries a `select`/`include`). Code that ignored their
