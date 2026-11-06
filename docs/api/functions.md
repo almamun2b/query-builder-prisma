@@ -63,9 +63,9 @@ resolveDialect('postgres');
 function setDialectDetector(detector: () => string | undefined): void;
 ```
 
-Plugs in a best-effort auto-detector. By contract it must never throw; an
-`undefined` result falls through to the built-in detector and then
-`'universal'`.
+Plugs in a best-effort auto-detector. It should not throw, but a throwing
+detector is ignored; an `undefined` result (or a throw) falls through to the
+built-in detector and then `'universal'`.
 
 ```ts
 setDialectDetector(() => process.env.DB_PROVIDER);

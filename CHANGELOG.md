@@ -5,6 +5,23 @@ Notable changes to `query-builder-prisma`. Format follows
 over the public surface (`src/index.ts` exports) plus the README behavior
 contracts.
 
+## [Unreleased]
+
+### Fixed
+
+- **Offset pagination no longer sends a leaked `custom({ cursor })`.** In
+  `.paginate()` / `.executeWithMeta()` mode a raw `cursor` survived next to
+  `skip`/`take` and Prisma silently returned the wrong rows.
+- **`custom({ where: null })` is ignored** instead of producing
+  `{ AND: [..., null] }`.
+- **`initialArgs` gets the same hardening as `custom()`**: `undefined` stripped
+  at any depth, `__proto__`/`constructor`/`prototype` keys throw.
+- **A throwing dialect detector is ignored** (resolution falls back to
+  `'universal'`) instead of crashing every `search()`.
+- **CommonJS consumers get the CJS type declarations** (`index.d.cts`);
+  `package.json` `exports` now carries separate `types` for `import` and
+  `require` (previously the ESM `.d.ts` was served to `require()` users).
+
 ## [0.3.0] — 2026-11-02
 
 Versions are produced by semantic-release from the commit history; this entry

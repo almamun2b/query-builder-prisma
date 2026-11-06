@@ -133,7 +133,9 @@ Semantics you can build on (the tests pin these):
 
 - **Precedence** — explicit methods always win over `custom()` args, regardless of
   call order: `.select(X)` beats `custom({ select: Y })`;
-  `.paginate(...)`/`.cursorPaginate(...)` beat `custom({ take })`;
+  `.paginate(...)`/`.cursorPaginate(...)` beat `custom({ take })`, and offset
+  pagination (`.paginate()`, `.executeWithMeta()`) never lets a raw
+  `custom({ cursor })` seek on top of its `skip`/`take`;
   `.sortBy()`/`.orderBy()` beat `custom({ orderBy })`. Projections resolve to
   exactly one key: explicit `.select()` > explicit `.include()` > a `select`
   from `custom()`/`initialArgs` > an `include` from the same — so `.select()`
@@ -144,9 +146,10 @@ Semantics you can build on (the tests pin these):
   `.custom({ where })` is AND-ed with the seed and previous custom `where`s —
   it never replaces them.
 - **`custom()` strips `undefined`** — at any depth, so
-  `custom({ distinct: undefined })` cannot overwrite an earlier value. Keys
+  `custom({ distinct: undefined })` cannot overwrite an earlier value (the
+  `initialArgs` seed is stripped the same way, and a `null` `where` is ignored). Keys
   named `__proto__`, `constructor` or `prototype` **throw** (`Refused key "…"`)
-  in `custom()`, `filter()`, `where()` and dot-path expansion (`range`,
+  in `custom()`, `initialArgs`, `filter()`, `where()` and dot-path expansion (`range`,
   `sortBy`) - they are never written and never silently dropped, because
   dropping a filter would widen the query. Empty input (`sortBy: ''`, empty
   `searchText`, `fields: []`) stays a documented no-op.

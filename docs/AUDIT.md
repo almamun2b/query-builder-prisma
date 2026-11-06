@@ -37,6 +37,12 @@ caller (or untyped input) produces `AND: [{ role }, null]` → Prisma runtime er
 _Fix:_ `where != null`, consistent with the sibling checks in the same method, plus a regression test. Ship as
 `fix:`.
 
+> **Status update (2026-11-06):** AUD-01 and AUD-02 are fixed with regression tests (AUD-02 only
+> misbehaved once a seed or earlier `custom({ where })` existed — a lone `null` was already dropped),
+> as are the `initialArgs` hardening gap and the uncaught throwing detector (Phase 0 items). A new
+> finding was fixed alongside: `package.json` `exports` served the ESM `index.d.ts` to `require()`
+> users — it now has per-condition `types` (`index.d.cts` for CJS).
+
 ## 2. Broken gate and hygiene
 
 | Item                             | Detail                                                                                                                                                                                                                                                                          | Fix                                                                                    |

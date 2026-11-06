@@ -99,8 +99,9 @@ registerDialect('my-future-db', {
 new QueryBuilder(prisma.thing, { dialect: 'my-future-db' }); // just works
 ```
 
-A custom auto-detector (best-effort by contract — it must never throw, and an
-`undefined` result falls through to `'universal'`):
+A custom auto-detector (best-effort by contract — it should not throw, but a
+throwing detector is ignored, and an `undefined` result falls through to
+`'universal'`):
 
 ```ts
 import { setDialectDetector } from 'query-builder-prisma';

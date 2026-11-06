@@ -85,6 +85,28 @@ describe('QueryBuilder conditions', () => {
       AND: [{ deletedAt: null }, { status: 'ACTIVE' }],
     });
   });
+
+  it('initialArgs seed strips undefined values at any depth', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(2));
+    await new QueryBuilder(delegate, {
+      initialArgs: {
+        where: { status: 'ACTIVE', email: undefined },
+        distinct: undefined,
+        cursor: { id: 'u1', extra: undefined },
+      } as never,
+    }).execute();
+    expect(recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
+    expect(recorded.findManyArgs?.cursor).toEqual({ id: 'u1' });
+    expect('distinct' in (recorded.findManyArgs ?? {})).toBe(false);
+  });
+
+  it('initialArgs seed throws on a hostile key like every other entry point', () => {
+    const { delegate } = createFakeDelegate(fakeRows(2));
+    const hostileTop = JSON.parse('{"__proto__":{"x":1}}') as never;
+    const hostileWhere = JSON.parse('{"where":{"status":"A","__proto__":{"x":1}}}') as never;
+    expect(() => new QueryBuilder(delegate, { initialArgs: hostileTop })).toThrow('Refused key');
+    expect(() => new QueryBuilder(delegate, { initialArgs: hostileWhere })).toThrow('Refused key');
+  });
 });
 
 describe('QueryBuilder search robustness', () => {
@@ -167,6 +189,26 @@ describe('QueryBuilder custom undefined strip', () => {
       .execute();
     expect(recorded.findManyArgs?.where).toBeUndefined();
   });
+
+  it('custom({ where: null }) adds no condition (never sends AND: [x, null])', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate)
+      .filter({ status: 'ACTIVE' })
+      .custom({ where: null as never })
+      .execute();
+    expect(recorded.findManyArgs?.where).toEqual({ status: 'ACTIVE' });
+  });
+
+  it('custom({ where: null }) after a real custom where leaves it untouched', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(3));
+    await new QueryBuilder(delegate, { initialArgs: { where: { deletedAt: null } } })
+      .custom({ where: { role: 'ADMIN' } })
+      .custom({ where: null as never })
+      .execute();
+    expect(recorded.findManyArgs?.where).toEqual({
+      AND: [{ deletedAt: null }, { role: 'ADMIN' }],
+    });
+  });
 });
 
 describe('QueryBuilder sorting', () => {
@@ -215,6 +257,23 @@ describe('QueryBuilder offset pagination', () => {
     await new QueryBuilder(delegate).execute();
     expect(recorded.findManyArgs?.skip).toBeUndefined();
     expect(recorded.findManyArgs?.take).toBeUndefined();
+  });
+
+  it('custom cursor does not leak into offset pagination (explicit methods win)', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate)
+      .custom({ cursor: { id: 'u9' } })
+      .paginate({ page: 2, limit: 5 })
+      .execute();
+    expect(recorded.findManyArgs?.cursor).toBeUndefined();
+    expect(recorded.findManyArgs?.skip).toBe(5);
+    expect(recorded.findManyArgs?.take).toBe(5);
+  });
+
+  it('custom cursor does not leak into executeWithMeta (offset defaults)', async () => {
+    const { delegate, recorded } = createFakeDelegate(fakeRows(30));
+    await new QueryBuilder(delegate).custom({ cursor: { id: 'u9' } }).executeWithMeta();
+    expect(recorded.findManyArgs?.cursor).toBeUndefined();
   });
 
   it('executeWithMeta returns meta matching the data', async () => {
