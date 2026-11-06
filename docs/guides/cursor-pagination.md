@@ -1,4 +1,8 @@
-# Cursor pagination
+---
+description: 'Cursor (keyset/seek) pagination for Prisma: infinite scroll, forward and backward walking, date cursors and exact hasNextPage flags.'
+---
+
+# Cursor (keyset) pagination in Prisma
 
 Cursor ("seek") pagination fetches the rows _after_ (or before) a reference
 row instead of skipping a computed offset. It stays fast on deep pages,
@@ -168,7 +172,7 @@ query count.
   _including_ the one-row over-fetch — that is the documented passthrough
   behavior for `buildArgs()`-style use. Always use `.executeWithCursor()` for
   trimmed, sort-ordered pages. See
-  [Known limitations](../../README.md#known-limitations).
+  [Known limitations](https://github.com/almamun2b/query-builder-prisma/blob/main/README.md#known-limitations).
 
 ## Related
 

@@ -1,4 +1,8 @@
-# Types
+---
+description: 'Public TypeScript types exported by query-builder-prisma, all derived structurally from your Prisma delegate.'
+---
+
+# Types API reference
 
 Every exported type, grouped by role. All of them are re-exported from the
 package root — `import type { FilterInput } from 'query-builder-prisma'`.

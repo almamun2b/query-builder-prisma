@@ -1,4 +1,8 @@
-# Documentation
+---
+description: 'Documentation for query-builder-prisma, a zero-dependency, type-safe Prisma query builder with offset and cursor pagination.'
+---
+
+# query-builder-prisma documentation
 
 [`query-builder-prisma`](https://www.npmjs.com/package/query-builder-prisma) — a
 zero-coupling, fluent, fully type-safe query builder
@@ -8,10 +12,10 @@ upgrade can never break your build.
 
 ## Start here
 
-| Document                                | What it covers                                           |
-| --------------------------------------- | -------------------------------------------------------- |
-| [Getting started](./getting-started.md) | Install, requirements, first query, ESM/CJS/Deno imports |
-| [README](../README.md)                  | Feature tour, behavior contracts, known limitations      |
+| Document                                                                        | What it covers                                           |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| [Getting started](./getting-started.md)                                         | Install, requirements, first query, ESM/CJS/Deno imports |
+| [README](https://github.com/almamun2b/query-builder-prisma/blob/main/README.md) | Feature tour, behavior contracts, known limitations      |
 
 ## Guides
 
@@ -58,8 +62,8 @@ Task-oriented, in the order you typically need them:
 ## Where normative behavior lives
 
 Semantics you can build on are pinned as contracts in the README
-([Behavior contracts](../README.md#behavior-contracts)); open gaps are listed
-under [Known limitations](../README.md#known-limitations). Design and
-architecture are documented in [ARCHITECTURE.md](../ARCHITECTURE.md); working
-rules for contributors in [AGENTS.md](../AGENTS.md) and
-[CONTRIBUTING.md](../CONTRIBUTING.md).
+([Behavior contracts](https://github.com/almamun2b/query-builder-prisma/blob/main/README.md#behavior-contracts)); open gaps are listed
+under [Known limitations](https://github.com/almamun2b/query-builder-prisma/blob/main/README.md#known-limitations). Design and
+architecture are documented in [ARCHITECTURE.md](https://github.com/almamun2b/query-builder-prisma/blob/main/ARCHITECTURE.md); working
+rules for contributors in [AGENTS.md](https://github.com/almamun2b/query-builder-prisma/blob/main/AGENTS.md) and
+[CONTRIBUTING.md](https://github.com/almamun2b/query-builder-prisma/blob/main/CONTRIBUTING.md).

@@ -1,4 +1,8 @@
-# Offset pagination
+---
+description: 'Offset (page/limit) pagination for Prisma with total count metadata, clamping rules and a fast path that skips COUNT.'
+---
+
+# Offset pagination in Prisma
 
 Offset ("skip/take") pagination is the classic page-number model: the client
 asks for _page N with limit L_, the builder computes `skip`/`take`, and

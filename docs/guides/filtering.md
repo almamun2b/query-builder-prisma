@@ -1,4 +1,8 @@
-# Filtering and search
+---
+description: 'Dynamic filtering, range queries and case-insensitive search for Prisma that strip undefined values and respect each database.'
+---
+
+# Filtering and search in Prisma
 
 Four chain methods add conditions to the query. They are additive: every
 condition you add is AND-ed with the others in the final `where`. All of them

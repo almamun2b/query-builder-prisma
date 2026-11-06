@@ -1,4 +1,8 @@
-# Sorting
+---
+description: 'Sort Prisma queries with sortBy and orderBy, including dot-path sorting on to-one relations.'
+---
+
+# Sorting in Prisma
 
 Two methods set `orderBy`. `.sortBy()` is single-key sugar fed by free-form
 input (sort dropdowns, query params); `.orderBy()` takes the full Prisma shape.
@@ -49,7 +53,7 @@ new QueryBuilder(prisma.user).custom({ orderBy: { id: 'asc' } }).sortBy({ sortBy
 ```
 
 Explicit builder methods always beat `.custom()` args, regardless of call
-order — see the [Behavior contracts](../../README.md#behavior-contracts).
+order — see the [Behavior contracts](https://github.com/almamun2b/query-builder-prisma/blob/main/README.md#behavior-contracts).
 
 ## Sorting for cursor pagination
 

@@ -7,3 +7,5 @@ coverage/
 .env
 .env.*
 .husky/_/
+docs/.vitepress/cache
+docs/.vitepress/dist

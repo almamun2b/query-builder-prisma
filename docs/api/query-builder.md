@@ -1,4 +1,8 @@
-# `QueryBuilder`
+---
+description: 'Every method of the query-builder-prisma QueryBuilder class: search, filter, range, sortBy, paginate, cursorPaginate, select, include, execute.'
+---
+
+# QueryBuilder API reference
 
 The fluent builder. Constructed with a model delegate, chained to describe the
 query, and executed with one of the terminal methods. All option and result
