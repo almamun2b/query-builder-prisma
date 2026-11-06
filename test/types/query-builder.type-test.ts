@@ -65,5 +65,9 @@ new QueryBuilder(userDelegate).sortBy({ sortBy: 'id', sortOrder: 'up' });
 new QueryBuilder(userDelegate).cursorPaginate({ cursor: '42', cursorType: 'number' });
 new QueryBuilder(userDelegate).cursorPaginate({ cursor: 42n, cursorType: 'bigint' });
 
+// a last page's `meta.nextCursor` (string | null) feeds straight back in
+declare const nextCursor: string | null | undefined;
+new QueryBuilder(userDelegate).cursorPaginate({ cursor: nextCursor });
+
 // @ts-expect-error - unknown cursorType
 new QueryBuilder(userDelegate).cursorPaginate({ cursor: '1', cursorType: 'uuid' });

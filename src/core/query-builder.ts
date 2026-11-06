@@ -35,6 +35,7 @@ import {
   clampLimit,
   coerceCursor,
   clampPage,
+  toNumber,
   toCursorArgs,
   toOffsetArgs,
   DEFAULT_PAGE_SIZE,
@@ -118,6 +119,10 @@ interface CursorPaging {
   direction: CursorDirection;
   field: string;
   strict: boolean;
+}
+
+function describeType(value: unknown): string {
+  return Array.isArray(value) ? 'an array' : typeof value;
 }
 
 /** Thrown by {@link QueryBuilder.firstOrThrow} when no row matched. */
@@ -214,7 +219,12 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * there.
    */
   search(params: { searchText?: string | undefined; fields: WhereKeyOf<D>[] }): this {
-    const text = params.searchText?.trim();
+    const raw: unknown = params.searchText;
+    if (raw !== undefined && raw !== null && typeof raw !== 'string') {
+      // e.g. Express `?q=a&q=b` -> array. Silently dropping it would widen the query.
+      throw new Error(`search(): searchText must be a string, got ${describeType(raw)}.`);
+    }
+    const text = raw?.trim();
     const fields = params.fields;
     if (text && fields.length > 0) {
       const { capabilities } = resolveDialect(this.dialect);
@@ -237,6 +247,9 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * `undefined` values are ignored so optional query params are safe to pass.
    */
   filter(filters: FilterInput<D>): this {
+    if (filters === undefined || filters === null) {
+      return this;
+    }
     const cleaned = stripUndefined(filters);
     if (Object.keys(cleaned).length > 0) {
       this.andConditions.push(cleaned);
@@ -251,6 +264,9 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    */
   range(ranges: Record<string, RangeInput>): this {
     for (const [path, bound] of Object.entries(ranges)) {
+      if (bound === undefined || bound === null) {
+        continue;
+      }
       const condition: Record<string, RangeBound> = {};
       if (bound.from !== undefined) {
         condition.gte = bound.from;
@@ -270,6 +286,9 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
 
   /** Adds an arbitrary, fully-typed Prisma `where` condition. */
   where(condition: WhereOf<D>): this {
+    if (condition === undefined || condition === null) {
+      return this;
+    }
     const cleaned = stripUndefined(condition as Record<string, unknown>);
     if (Object.keys(cleaned).length > 0) {
       this.andConditions.push(cleaned);
@@ -333,7 +352,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
    * Takes precedence over {@link paginate} when both are set.
    */
   cursorPaginate(params: {
-    cursor?: CursorValue | undefined;
+    cursor?: CursorValue | null | undefined;
     cursorType?: CursorType;
     limit?: number;
     direction?: CursorDirection;
@@ -675,7 +694,8 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     if (!this.strictNumbers || limit === undefined) {
       return;
     }
-    if (!Number.isFinite(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
+    const n = toNumber(limit);
+    if (!Number.isFinite(n) || n < 1 || n > MAX_PAGE_SIZE) {
       throw new Error(`strictNumbers: limit ${String(limit)} is outside [1, ${MAX_PAGE_SIZE}].`);
     }
   }
@@ -684,7 +704,8 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     if (!this.strictNumbers || page === undefined) {
       return;
     }
-    if (!Number.isFinite(page) || page < 1) {
+    const n = toNumber(page);
+    if (!Number.isFinite(n) || n < 1) {
       throw new Error(`strictNumbers: page ${String(page)} must be a finite number >= 1.`);
     }
   }

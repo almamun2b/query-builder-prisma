@@ -78,7 +78,7 @@ Prisma installed; that is the standing proof.
 | ------------------------------------- | ------------------------ | ---------------------------------- | -------------------------------------- |
 | Pagination with total count           | `executeWithMeta()`      | `count` + `findMany` wired by hand | Depends on the extension you install   |
 | Cursor pagination                     | `executeWithCursor()`    | Over-fetch and cursor math by hand | Depends on the extension you install   |
-| Optional filters (`undefined` values) | Stripped at any depth    | Manual `if`s or spreads            | Not applicable                         |
+| Optional filters (`undefined` values) | Stripped (top level)     | Manual `if`s or spreads            | Not applicable                         |
 | Per-database `mode: 'insensitive'`    | Dialect-aware            | Throws on MySQL/SQLite/SQL Server  | Not applicable                         |
 | Coupled to a Prisma version           | No (zero Prisma imports) | No                                 | Yes (uses the client's extension APIs) |
 | Result type narrowed by `select`      | Yes, structurally        | Yes (Prisma's own)                 | Yes (Prisma's own)                     |
@@ -216,6 +216,8 @@ Semantics you can build on (the tests pin these):
   `cursorType: 'number' | 'bigint' | 'date'` to convert a cursor read back from a
   query string. The default `'string'` passes the value through unchanged; an
   unconvertible cursor throws in `cursorPaginate()`, before any query is sent.
+  `null` (a last page's `nextCursor`) and `''` (an empty `?cursor=`) mean "no
+  cursor" - the first page - for every `cursorType`; nothing is sent to Prisma.
 - **Cursor flags are optimistic by default** — `hasNextPage`/`hasPrevPage` come
   from a one-row over-fetch and can rarely claim a page exists that turns out
   empty. `cursorPaginate({ strict: true })` spends one extra 1-row probe query
@@ -225,7 +227,8 @@ Semantics you can build on (the tests pin these):
   edge row has a missing/`null` cursor value or an Invalid Date (the page
   cursor cannot be built) — never a cursor of `"undefined"`/`"null"`.
 - **Clamping** — `limit` is clamped silently to `[1, 1000]`; pages below 1
-  become page 1; a page whose computed `skip` exceeds `100_000` is served as an
+  become page 1; numeric strings (`'2'`, straight from a query string) are read
+  as numbers, other strings fall back to the defaults (page 1 / limit 10); a page whose computed `skip` exceeds `100_000` is served as an
   **empty page** (`take: 0`) with `meta.page` still the requested page — never as
   a different page (deep access → cursor pagination). With `new QueryBuilder(delegate, { strictNumbers: true })` all of
   these throw instead of clamping.
@@ -246,7 +249,8 @@ Semantics you can build on (the tests pin these):
   first row of the whole result set, not of a configured page.
 - **`search()`** — pass scalar string fields only (relation keys compile but
   throw at Prisma runtime); empty or whitespace-only `searchText` adds no
-  condition; each `OR` arm gets its own match object.
+  condition, a non-string `searchText` (e.g. an array from `?q=a&q=b`) throws
+  instead of silently dropping the filter; each `OR` arm gets its own match object.
 - **`range()` reaches to-one paths only** — dot paths expand for to-one
   relations and nested objects; filtering a to-many relation needs
   `.custom({ where: { posts: { some: { ... } } } })`.
@@ -334,7 +338,8 @@ case-sensitive. See [Dialects](./docs/guides/dialects.md).
 
 **How do I build dynamic filters from query-string parameters?**
 Pass the raw values to `filter()`, `range()` and `search()`: `undefined` values are
-dropped at any depth, so absent parameters add no condition. See
+dropped (and nullish `range()` bounds and `filter()`/`where()` inputs are
+skipped), so absent parameters add no condition. See
 [Filtering and search](./docs/guides/filtering.md).
 
 **Does it work with NestJS, Next.js and Express?**
