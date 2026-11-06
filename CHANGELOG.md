@@ -7,6 +7,8 @@ contracts.
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-11-06
+
 ### Fixed
 
 - **Offset pagination no longer sends a leaked `custom({ cursor })`.** In

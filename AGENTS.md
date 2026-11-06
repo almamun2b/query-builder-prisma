@@ -33,6 +33,14 @@ product's entire moat — every rule below protects it.
   updating npm). Never run `npm publish` or `npm version` by hand. `main` is protected
   (PR-only), so the release bot commits nothing back: the latest `v*` tag / npm
   is the current version and `package.json` on `main` is not bumped.
+- **Changelog after every release (agent duty).** semantic-release never edits
+  `CHANGELOG.md` (no changelog/git plugin, and `main` is PR-only), so whenever a
+  release occurs (a new `v*` tag exists / the Release workflow went green) the
+  agent working in the repo must: (1) rename `## [Unreleased]` to
+  `## [X.Y.Z] — YYYY-MM-DD` using the real tag and date (`git tag -n1 --sort=-v:refname`, then
+  `git log -1 --format=%ad --date=short vX.Y.Z`), (2) add a fresh empty `## [Unreleased]` above it, (3) commit as `docs: …` (never
+  releases) on a new branch cut from `origin/main`, and (4) push that branch for
+  a PR. Never leave released changes under `[Unreleased]`.
 - The 1.x version line is permanently burned on npm: `1.0.0` was mis-released
   and unpublished on 2026-11-01, and `1.1.0` (published hours later from the
   pre-revert history) was unpublished the same day — and npm never re-allows an
