@@ -1,25 +1,56 @@
 {
   "name": "query-builder-prisma",
   "version": "0.2.0",
-  "description": "Zero-coupling, fluent, fully type-safe query builder for any Prisma model delegate. Works with every Prisma version (5+, by design all versions) and every database Prisma supports.",
+  "description": "Type-safe, fluent query builder for Prisma: search, filter, sort, offset and cursor pagination, select/include projections. Zero dependencies, works with every Prisma version and database.",
   "license": "MIT",
-  "author": "Mamun",
+  "author": {
+    "name": "Mamun",
+    "url": "https://github.com/almamun2b"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/almamun2b/query-builder-prisma.git"
   },
-  "homepage": "https://github.com/almamun2b/query-builder-prisma#readme",
+  "homepage": "https://almamun2b.github.io/query-builder-prisma/",
   "bugs": {
     "url": "https://github.com/almamun2b/query-builder-prisma/issues"
   },
   "keywords": [
     "prisma",
+    "prisma-client",
+    "prisma-orm",
+    "prisma-query-builder",
+    "prisma-pagination",
+    "prisma-filter",
+    "prisma-search",
     "query-builder",
     "querybuilder",
     "pagination",
     "cursor-pagination",
+    "offset-pagination",
+    "keyset-pagination",
+    "seek-pagination",
+    "infinite-scroll",
     "typescript",
-    "orm"
+    "type-safe",
+    "typesafe",
+    "orm",
+    "fluent",
+    "fluent-api",
+    "filtering",
+    "sorting",
+    "findMany",
+    "zero-dependency",
+    "nestjs",
+    "nextjs",
+    "express",
+    "postgresql",
+    "mysql",
+    "sqlite",
+    "mongodb",
+    "sqlserver",
+    "cockroachdb",
+    "mariadb"
   ],
   "type": "module",
   "main": "./dist/index.cjs",
@@ -57,7 +88,10 @@
     "format:check": "prettier --check .",
     "verify": "npm run lint && npm run typecheck && npm test && npm run build",
     "prepublishOnly": "npm run verify",
-    "prepare": "husky"
+    "prepare": "husky",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
@@ -70,6 +104,7 @@
     "tsup": "^8.3.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.18.0",
+    "vitepress": "^1.6.4",
     "vitest": "^2.1.8"
   },
   "allowScripts": {

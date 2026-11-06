@@ -4,10 +4,17 @@
 [![CI](https://github.com/almamun2b/query-builder-prisma/actions/workflows/ci.yml/badge.svg)](https://github.com/almamun2b/query-builder-prisma/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/query-builder-prisma.svg)](./LICENSE)
 [![node](https://img.shields.io/node/v/query-builder-prisma.svg)](https://www.npmjs.com/package/query-builder-prisma)
+[![npm downloads](https://img.shields.io/npm/dm/query-builder-prisma.svg)](https://www.npmjs.com/package/query-builder-prisma)
+[![types](https://img.shields.io/npm/types/query-builder-prisma.svg)](https://www.npmjs.com/package/query-builder-prisma)
+[![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](https://www.npmjs.com/package/query-builder-prisma)
+[![docs](https://img.shields.io/badge/docs-almamun2b.github.io-blue.svg)](https://almamun2b.github.io/query-builder-prisma/)
 
-> Zero-coupling, fluent, fully type-safe query builder for any Prisma model
-> delegate. Works with **every Prisma version — 5, 6, 7, 8 and future majors by
-> design** — and every database Prisma supports.
+> **Type-safe, fluent Prisma query builder** for search, filtering, sorting,
+> **offset and cursor (keyset) pagination**, and `select`/`include` projections.
+> Wraps any Prisma model delegate, has **zero dependencies**, and works with
+> **every Prisma version — 5, 6, 7, 8 and future majors by design** — and every
+> database Prisma supports (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server,
+> CockroachDB, MongoDB).
 
 ```ts
 const { meta, data } = await new QueryBuilder(prisma.user)
@@ -37,6 +44,44 @@ It imports **nothing** from Prisma — no runtime imports, no type imports, no
 peer dependencies. All types are derived structurally from the delegate you
 pass in, so a Prisma upgrade can never break it. The test suite runs with zero
 Prisma installed; that is the standing proof.
+
+## What problems does it solve?
+
+- **Prisma pagination** — `paginate({ page, limit })` + `executeWithMeta()` give you
+  the rows and `{ page, limit, total, totalPage }` in one call (offset pagination).
+- **Prisma cursor pagination** — `cursorPaginate()` + `executeWithCursor()` give stable
+  keyset (seek) pages for infinite scroll and feeds, with `nextCursor`/`prevCursor`.
+- **Dynamic filtering and search from query params** — `search()`, `filter()` and
+  `range()` strip `undefined` values and AND everything into one `where`, so an
+  optional `?status=` or `?q=` never produces a broken query.
+- **Case-insensitive search that works on your database** — `search()` emits
+  `mode: 'insensitive'` only where Prisma accepts it (PostgreSQL, CockroachDB,
+  MongoDB) instead of throwing on MySQL, MariaDB, SQLite or SQL Server.
+- **Typed `select` / `include` results** — the result type of `.select()` and
+  `.include()` narrows like Prisma's own, without importing a Prisma type.
+- **Upgrades that cannot break it** — no `@prisma/client` import, so a new Prisma
+  major does not need a new release of this package.
+
+## Supported
+
+| Area           | Supported                                                                                      |
+| -------------- | ---------------------------------------------------------------------------------------------- |
+| Prisma         | 5, 6, 7, 8 today; future majors by design (any delegate with the `findMany` + `count` shape)   |
+| Databases      | PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, CockroachDB, MongoDB (plus a `universal` mode) |
+| Frameworks     | Next.js, NestJS, Express, Fastify, Koa, Hono ([recipes](./docs/framework-recipes.md))          |
+| Runtimes       | Node.js ≥ 18, Bun, Deno (npm specifier), Vercel Edge, Cloudflare Workers                       |
+| Module formats | ESM and CommonJS, with bundled TypeScript declarations                                         |
+
+## How it compares
+
+|                                       | `query-builder-prisma`   | Hand-written `findMany` args       | Prisma client extensions (`$extends`)  |
+| ------------------------------------- | ------------------------ | ---------------------------------- | -------------------------------------- |
+| Pagination with total count           | `executeWithMeta()`      | `count` + `findMany` wired by hand | Depends on the extension you install   |
+| Cursor pagination                     | `executeWithCursor()`    | Over-fetch and cursor math by hand | Depends on the extension you install   |
+| Optional filters (`undefined` values) | Stripped at any depth    | Manual `if`s or spreads            | Not applicable                         |
+| Per-database `mode: 'insensitive'`    | Dialect-aware            | Throws on MySQL/SQLite/SQL Server  | Not applicable                         |
+| Coupled to a Prisma version           | No (zero Prisma imports) | No                                 | Yes (uses the client's extension APIs) |
+| Result type narrowed by `select`      | Yes, structurally        | Yes (Prisma's own)                 | Yes (Prisma's own)                     |
 
 ## Install
 
@@ -270,6 +315,31 @@ Open and documented rather than hidden. Each says how it fails and what to do in
   a cast to satisfy the `dialect` option's built-in union.
 
 ## FAQ
+
+**How do I paginate in Prisma?**
+Use `new QueryBuilder(prisma.user).paginate({ page, limit }).executeWithMeta()` — it
+runs `findMany` and `count` in parallel and returns `{ meta: { page, limit, total,
+totalPage }, data }`. See [Offset pagination](./docs/guides/pagination.md).
+
+**How do I do cursor (keyset) pagination in Prisma?**
+Use `.cursorPaginate({ cursor, cursorField, limit }).executeWithCursor()`; it returns
+`nextCursor`/`prevCursor` and `hasNextPage`/`hasPrevPage`. See
+[Cursor pagination](./docs/guides/cursor-pagination.md).
+
+**How do I do case-insensitive search in Prisma on MySQL or SQLite?**
+Prisma's `mode: 'insensitive'` throws outside PostgreSQL, CockroachDB and MongoDB.
+`search()` only emits it where it is accepted; on MySQL, MariaDB and SQL Server the
+default collation is already case-insensitive, and SQLite's ASCII `LIKE` is
+case-sensitive. See [Dialects](./docs/guides/dialects.md).
+
+**How do I build dynamic filters from query-string parameters?**
+Pass the raw values to `filter()`, `range()` and `search()`: `undefined` values are
+dropped at any depth, so absent parameters add no condition. See
+[Filtering and search](./docs/guides/filtering.md).
+
+**Does it work with NestJS, Next.js and Express?**
+Yes — any framework works because a builder is just an object created per request.
+See the [framework recipes](./docs/framework-recipes.md).
 
 **Does this need Prisma installed?**
 The package never imports Prisma, but of course you query _through_ your
