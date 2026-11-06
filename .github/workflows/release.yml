@@ -8,6 +8,11 @@ name: Release
 #   feat!:/BREAKING CHANGE: → major   (1.0.0)
 #   chore:/docs:/ci:/test:  → no release ("no relevant changes")
 #
+# Auth to npm is TOKENLESS: npm "trusted publishing" (OIDC). The package's
+# npm settings name this repo + the workflow FILE NAME `release.yml`, so do not
+# rename this file without updating the trusted publisher on npmjs.com. There
+# is no NPM_TOKEN secret; see CONTRIBUTING.md "One-time npm setup".
+#
 # On a release it stamps the version into package.json inside the runner,
 # publishes to npm with provenance (prepublishOnly runs the full verify
 # pipeline first), pushes the v* tag and creates the GitHub Release with
@@ -35,7 +40,7 @@ on:
 
 permissions:
   contents: write # v* tag, GitHub Release
-  id-token: write # npm provenance attestation
+  id-token: write # OIDC: npm trusted publishing + provenance
 
 concurrency:
   group: npm-release
@@ -53,10 +58,13 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org/
+      - name: Tool versions (trusted publishing needs npm >= 11.6.2)
+        run: node --version && npm --version
       - run: npm ci
       - name: semantic-release
+        # No NPM_TOKEN: @semantic-release/npm exchanges the job's OIDC token
+        # for a short-lived npm publish token (trusted publisher), and the
+        # provenance attestation is generated automatically.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
         run: npx semantic-release

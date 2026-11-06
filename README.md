@@ -319,9 +319,11 @@ see `.github/workflows/release.yml`):
 | `feat!:` / `BREAKING CHANGE:` footer | major   | 0.2.0 → 1.0.0 |
 | `chore:` / `docs:` / `ci:` / `test:` | none    | no release    |
 
-A release publishes the new version to npm with provenance (the full
-verify pipeline runs first; `package.json` on `main` is not bumped — the `v*`
-tag is the version source of truth), pushes the `v*` tag, and creates the GitHub
+A release publishes the new version to npm with provenance via npm trusted
+publishing (OIDC — no `NPM_TOKEN` secret; setup in
+[CONTRIBUTING.md](./CONTRIBUTING.md#one-time-npm-setup-trusted-publishing-no-token));
+the full verify pipeline runs first, and `package.json` on `main` is not bumped —
+the `v*` tag is the version source of truth. The release pushes the `v*` tag and creates the GitHub
 Release with generated notes. [`CHANGELOG.md`](./CHANGELOG.md) stays
 hand-maintained; the auto-generated notes live on
 [GitHub Releases](https://github.com/almamun2b/query-builder-prisma/releases).

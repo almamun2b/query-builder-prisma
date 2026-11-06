@@ -28,7 +28,9 @@ product's entire moat — every rule below protects it.
   config in `.releaserc.json`) publishes on every push to `main` whose
   Conventional Commits warrant a version — `fix:` → patch, `feat:` → minor,
   `feat!:`/`BREAKING CHANGE:` → major; `chore:`/`docs:`/`ci:`/`test:` never
-  release. Never run `npm publish` or `npm version` by hand. `main` is protected
+  release. Publishing is tokenless (npm trusted publishing/OIDC bound to
+  `release.yml` — there is no `NPM_TOKEN`; never rename that file without
+  updating npm). Never run `npm publish` or `npm version` by hand. `main` is protected
   (PR-only), so the release bot commits nothing back: the latest `v*` tag / npm
   is the current version and `package.json` on `main` is not bumped.
 - The 1.x version line is permanently burned on npm: `1.0.0` was mis-released
