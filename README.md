@@ -133,7 +133,9 @@ Semantics you can build on (the tests pin these):
 
 - **Precedence** — explicit methods always win over `custom()` args, regardless of
   call order: `.select(X)` beats `custom({ select: Y })`;
-  `.paginate(...)`/`.cursorPaginate(...)` beat `custom({ take })`;
+  `.paginate(...)`/`.cursorPaginate(...)` beat `custom({ take })`, and offset
+  pagination (`.paginate()`, `.executeWithMeta()`) never lets a raw
+  `custom({ cursor })` seek on top of its `skip`/`take`;
   `.sortBy()`/`.orderBy()` beat `custom({ orderBy })`. Projections resolve to
   exactly one key: explicit `.select()` > explicit `.include()` > a `select`
   from `custom()`/`initialArgs` > an `include` from the same — so `.select()`
@@ -144,9 +146,10 @@ Semantics you can build on (the tests pin these):
   `.custom({ where })` is AND-ed with the seed and previous custom `where`s —
   it never replaces them.
 - **`custom()` strips `undefined`** — at any depth, so
-  `custom({ distinct: undefined })` cannot overwrite an earlier value. Keys
+  `custom({ distinct: undefined })` cannot overwrite an earlier value (the
+  `initialArgs` seed is stripped the same way, and a `null` `where` is ignored). Keys
   named `__proto__`, `constructor` or `prototype` **throw** (`Refused key "…"`)
-  in `custom()`, `filter()`, `where()` and dot-path expansion (`range`,
+  in `custom()`, `initialArgs`, `filter()`, `where()` and dot-path expansion (`range`,
   `sortBy`) - they are never written and never silently dropped, because
   dropping a filter would widen the query. Empty input (`sortBy: ''`, empty
   `searchText`, `fields: []`) stays a documented no-op.
@@ -319,9 +322,11 @@ see `.github/workflows/release.yml`):
 | `feat!:` / `BREAKING CHANGE:` footer | major   | 0.2.0 → 1.0.0 |
 | `chore:` / `docs:` / `ci:` / `test:` | none    | no release    |
 
-A release publishes the new version to npm with provenance (the full
-verify pipeline runs first; `package.json` on `main` is not bumped — the `v*`
-tag is the version source of truth), pushes the `v*` tag, and creates the GitHub
+A release publishes the new version to npm with provenance via npm trusted
+publishing (OIDC — no `NPM_TOKEN` secret; setup in
+[CONTRIBUTING.md](./CONTRIBUTING.md#one-time-npm-setup-trusted-publishing-no-token));
+the full verify pipeline runs first, and `package.json` on `main` is not bumped —
+the `v*` tag is the version source of truth. The release pushes the `v*` tag and creates the GitHub
 Release with generated notes. [`CHANGELOG.md`](./CHANGELOG.md) stays
 hand-maintained; the auto-generated notes live on
 [GitHub Releases](https://github.com/almamun2b/query-builder-prisma/releases).

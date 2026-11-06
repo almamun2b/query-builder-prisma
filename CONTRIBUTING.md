@@ -78,3 +78,52 @@ Scope is free-form (`feat(dialects): …`); the type is what matters.
 checks the tarball file list, coupling sweep, scope drift, and the
 known-limitations review. Semver applies to the `src/index.ts` exports plus the
 README behavior contracts.
+
+### One-time npm setup (trusted publishing, no token)
+
+Releases authenticate to npm with **trusted publishing** (OIDC): the GitHub
+Actions job proves its identity to npm, which hands back a short-lived publish
+credential and attaches provenance automatically. There is no `NPM_TOKEN`
+secret to create, rotate or leak (npm is retiring 2FA-bypass tokens).
+
+1. **npmjs.com** → package `query-builder-prisma` → **Settings** →
+   **Trusted Publisher** → **GitHub Actions**, then enter exactly (case-sensitive):
+   - Organization or user: `almamun2b`
+   - Repository: `query-builder-prisma`
+   - Workflow filename: `release.yml`
+   - Environment name: leave blank
+   - Allowed actions: tick **Allow `npm publish`** (semantic-release runs a
+     plain `npm publish`; without it npm only accepts a _staged_ publish that a
+     human must approve with 2FA, so nothing would auto-release). Leave
+     **Allow `npm dist-tag`** unticked — only needed for prerelease/maintenance
+     channels, and `.releaserc.json` releases from `main` only.
+
+   Save. (You must be an owner of the package and have 2FA enabled.)
+
+2. **Prove it works**: merge a releasable commit (`fix:` / `feat:`) to `main`.
+   In the Release run's log, `semantic-release` prints
+   `OIDC token exchange with the npm registry succeeded`; the npm package page
+   then shows a provenance badge.
+
+3. **Lock it down** (only after step 2 succeeded): npm package → **Settings** →
+   **Publishing access** → _Require two-factor authentication and disallow
+   tokens_. Then revoke the old automation / bypass-2FA token under npm
+   **Account → Access Tokens**, and delete the `NPM_TOKEN` secret in GitHub →
+   repo **Settings → Secrets and variables → Actions**.
+
+Requirements already met by the workflow: `permissions: id-token: write`, a
+GitHub-hosted runner, Node 24 (npm >= 11.6.2), and `repository.url` in
+`package.json` matching this GitHub repo.
+
+### Troubleshooting a failed release
+
+- `OIDC token exchange ... failed` / `ENEEDAUTH` / `E404` on publish: the
+  trusted-publisher fields on npm do not match (owner, repo, or workflow file
+  name). Fix them on npmjs.com and re-run the workflow from the Actions tab
+  (`workflow_dispatch`).
+- "Have you granted the `id-token: write` permission": the workflow
+  `permissions` block lost `id-token: write`.
+- Renaming `release.yml` (or moving the repo) silently breaks publishing until
+  the trusted publisher is updated to the new name.
+- `E400 Cannot publish over previously published version`: see the burned 1.x
+  runbook in `AGENTS.md`.

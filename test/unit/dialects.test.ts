@@ -34,6 +34,21 @@ describe('resolveDialect', () => {
     expect(resolveDialect().name).toBe('universal');
     expect(resolveDialect().capabilities.caseInsensitiveMode).toBe(false);
   });
+  it('a throwing detector is ignored: resolution fails soft to universal', () => {
+    setDialectDetector(() => {
+      throw new Error('detector bug');
+    });
+    expect(() => resolveDialect()).not.toThrow();
+    expect(resolveDialect().name).toBe('universal');
+  });
+  it('explicit and global dialects still win over a throwing detector', () => {
+    setDialectDetector(() => {
+      throw new Error('detector bug');
+    });
+    configQueryBuilder({ dialect: 'mysql' });
+    expect(resolveDialect().name).toBe('mysql');
+    expect(resolveDialect('postgresql').name).toBe('postgresql');
+  });
   it('registerDialect supports future databases without core changes', () => {
     registerDialect('futuredb', { caseInsensitiveMode: true, caseInsensitiveCollation: false });
     expect(resolveDialect('futuredb').capabilities.caseInsensitiveMode).toBe(true);

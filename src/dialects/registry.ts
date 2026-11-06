@@ -59,6 +59,15 @@ export function setDialectDetector(detector: () => string | undefined): void {
   state().detector = detector;
 }
 
+/** Runs a user-supplied detector; a throwing one is ignored so resolution fails soft. */
+function runDetector(detector: (() => string | undefined) | undefined): string | undefined {
+  try {
+    return detector?.();
+  } catch {
+    return undefined;
+  }
+}
+
 /** A dialect name plus the capabilities resolved for it. */
 export interface ResolvedDialect {
   name: string;
@@ -72,7 +81,8 @@ export interface ResolvedDialect {
  */
 export function resolveDialect(explicit?: string | undefined): ResolvedDialect {
   const s = state();
-  const requested = explicit ?? s.globalDialect ?? s.detector?.() ?? detectDialect() ?? 'universal';
+  const requested =
+    explicit ?? s.globalDialect ?? runDetector(s.detector) ?? detectDialect() ?? 'universal';
   const capabilities = s.registry.get(requested);
   return capabilities
     ? { name: requested, capabilities }

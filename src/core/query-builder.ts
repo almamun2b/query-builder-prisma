@@ -192,7 +192,10 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     this.dialect = options?.dialect;
     this.strictNumbers = options?.strictNumbers ?? false;
     if (options?.initialArgs) {
-      const { where, select, include, ...rest } = options.initialArgs as Record<string, unknown>;
+      // Same hardening as `.custom()`: refuse prototype keys, strip `undefined` at any depth.
+      const { where, select, include, ...rest } = deepStripUndefined(
+        options.initialArgs as Record<string, unknown>,
+      );
       this.customArgs = { ...rest };
       this.customWhere = where;
       this.customSelect = (select ?? undefined) as object | undefined;
@@ -434,7 +437,7 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
     if (include !== undefined && include !== null) {
       target.customInclude = deepStripUndefined(include as Record<string, unknown>);
     }
-    if (where !== undefined) {
+    if (where !== undefined && where !== null) {
       const cleaned = isPlainObject(where) ? deepStripUndefined(where) : where;
       const hasKeys = !isPlainObject(cleaned) || Object.keys(cleaned).length > 0;
       if (hasKeys) {
@@ -646,6 +649,8 @@ export class QueryBuilder<D extends PrismaModelDelegate, TArgs = object> {
         args.skip = cursorArgs.skip;
       }
     } else if (paging?.kind === 'offset') {
+      // Offset mode owns skip/take; a raw `custom({ cursor })` must not seek on top of them.
+      delete args.cursor;
       this.assertSkipCap(paging.page, paging.limit);
       const offset = toOffsetArgs(paging.page, paging.limit);
       args.take = offset.take;
