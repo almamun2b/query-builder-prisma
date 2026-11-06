@@ -1,4 +1,8 @@
-# Getting started
+---
+description: 'Install query-builder-prisma and run your first type-safe Prisma query with search, filters, sorting and pagination.'
+---
+
+# Getting started with query-builder-prisma
 
 `query-builder-prisma` wraps any Prisma model delegate in a fluent, type-safe
 builder for search, filtering, sorting, pagination and projections. It has

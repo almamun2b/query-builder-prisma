@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://almamun2b.github.io/query-builder-prisma/sitemap.xml

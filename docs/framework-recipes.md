@@ -1,4 +1,8 @@
-# Framework recipes
+---
+description: 'Use query-builder-prisma in Next.js route handlers, NestJS services, Express, Fastify, Hono and edge runtimes.'
+---
+
+# Prisma query builder for Next.js, NestJS and Express
 
 The one rule that matters in every framework: **one builder instance per query —
 never share an instance across concurrent requests.** A builder accumulates

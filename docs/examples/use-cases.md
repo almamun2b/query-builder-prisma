@@ -1,4 +1,8 @@
-# Use cases
+---
+description: 'End-to-end Prisma examples: paginated admin tables from REST query params and infinite-scroll feeds with cursor pagination.'
+---
+
+# Prisma query builder use cases
 
 End-to-end scenarios showing the builder in realistic shapes. Examples assume
 a Prisma client with `User`/`Post` models (`id`, `email`, `status`, `role`,

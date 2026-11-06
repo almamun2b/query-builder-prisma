@@ -1,4 +1,8 @@
-# Projections (select/include)
+---
+description: 'Narrow Prisma result types with select and include, including nested relations, without importing any Prisma type.'
+---
+
+# Type-safe select and include in Prisma (select/include)
 
 `.select()` and `.include()` narrow or widen the result type of every execute
 method through a structural projection engine — the same narrowing you know
@@ -134,6 +138,6 @@ Projections compose with both pagination modes:
 ## Related
 
 - [Cursor pagination](./cursor-pagination.md#guards) — the projection guard
-- [Known limitations](../../README.md#known-limitations) — the `_count` gap
+- [Known limitations](https://github.com/almamun2b/query-builder-prisma/blob/main/README.md#known-limitations) — the `_count` gap
 - [QueryBuilder API — select](../api/query-builder.md#select) /
   [include](../api/query-builder.md#include)

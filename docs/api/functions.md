@@ -1,4 +1,8 @@
-# Functions and constants
+---
+description: 'Dialect registry functions and constants exported by query-builder-prisma.'
+---
+
+# Functions and constants API reference
 
 Everything exported from the package root besides the `QueryBuilder` class
 and the [types](./types.md): the dialect registry API and the

@@ -1,4 +1,8 @@
-# Advanced patterns
+---
+description: 'Advanced query-builder-prisma patterns: initialArgs safety seeds, custom args, cloning builders and one builder per query.'
+---
+
+# Advanced patterns for the Prisma query builder
 
 ## `.custom()` — raw args, safely merged
 
@@ -146,6 +150,6 @@ For builders fed from untrusted input (parsed JSON bodies, query strings):
 
 ## Related
 
-- [Behavior contracts](../../README.md#behavior-contracts) — the normative list
+- [Behavior contracts](https://github.com/almamun2b/query-builder-prisma/blob/main/README.md#behavior-contracts) — the normative list
 - [Framework recipes](../framework-recipes.md) — per-framework wiring
 - [QueryBuilder API — custom](../api/query-builder.md#custom)

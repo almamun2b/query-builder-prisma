@@ -1,4 +1,8 @@
-# Dialects
+---
+description: 'How the dialect capability registry makes Prisma search work on PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, CockroachDB and MongoDB.'
+---
+
+# Prisma database dialects: PostgreSQL, MySQL, SQLite, MongoDB and more
 
 Prisma-supported databases disagree on what arguments they accept — most
 notably `mode: 'insensitive'` on string filters, which works on PostgreSQL,
