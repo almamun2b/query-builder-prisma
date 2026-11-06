@@ -5,6 +5,18 @@ Notable changes to `query-builder-prisma`. Format follows
 over the public surface (`src/index.ts` exports) plus the README behavior
 contracts.
 
+## [0.3.2] — 2026-11-06
+
+### Fixed
+
+- **Better npm discoverability**: sharper package `description`, expanded
+  `keywords` and a search-oriented README (`fix(package)`).
+
+### Documentation
+
+- New VitePress documentation site (guides, API pages, framework recipes),
+  deployed to GitHub Pages and built on every pull request.
+
 ## [0.3.1] — 2026-11-06
 
 ### Fixed

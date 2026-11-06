@@ -4,6 +4,7 @@ import {
   coerceCursor,
   buildPaginationMeta,
   clampLimit,
+  clampPage,
   serializeCursorValue,
   toCursorArgs,
   toOffsetArgs,
@@ -19,6 +20,20 @@ describe('clampLimit', () => {
   });
   it('defaults non-finite to 10', () => {
     expect(clampLimit(Number.NaN)).toBe(10);
+  });
+  it('accepts numeric strings (query-string input) and defaults junk strings', () => {
+    expect(clampLimit('25' as unknown as number)).toBe(25);
+    expect(clampLimit(' 5 ' as unknown as number)).toBe(5);
+    expect(clampLimit('abc' as unknown as number)).toBe(10);
+    expect(clampLimit('' as unknown as number)).toBe(10);
+  });
+});
+
+describe('clampPage', () => {
+  it('accepts numeric strings and falls back to page 1 for junk', () => {
+    expect(clampPage('3' as unknown as number)).toBe(3);
+    expect(clampPage('abc' as unknown as number)).toBe(1);
+    expect(clampPage('' as unknown as number)).toBe(1);
   });
 });
 
@@ -225,6 +240,13 @@ describe('coerceCursor', () => {
     expect(coerceCursor(undefined, 'number')).toBeUndefined();
   });
 
+  it('treats null and an empty string as "no cursor" for every cursorType', () => {
+    for (const type of ['string', 'number', 'bigint', 'date'] as const) {
+      expect(coerceCursor(null, type)).toBeUndefined();
+      expect(coerceCursor('', type)).toBeUndefined();
+    }
+  });
+
   it("'number' parses a cursor string from a query string", () => {
     expect(coerceCursor('42', 'number')).toBe(42);
     expect(coerceCursor(' 7 ', 'number')).toBe(7);
@@ -233,7 +255,7 @@ describe('coerceCursor', () => {
 
   it("'number' rejects non-numeric input with a message naming the value", () => {
     expect(() => coerceCursor('abc', 'number')).toThrow('"abc"');
-    expect(() => coerceCursor('', 'number')).toThrow('number');
+    expect(() => coerceCursor('  ', 'number')).toThrow('number');
     expect(() => coerceCursor(Number.NaN, 'number')).toThrow('number');
     expect(() => coerceCursor('Infinity', 'number')).toThrow('number');
   });

@@ -15,20 +15,34 @@ export const MAX_PAGE_SIZE = 1000;
 /** Upper bound for offset `skip` so deep pages cannot hit the DB unbounded (beyond it: empty page). */
 export const MAX_SKIP = 100_000;
 
+/**
+ * Numeric strings (`'2'`, as read straight from a query string) are accepted as numbers; blank or
+ * non-numeric strings become `NaN`. Everything else is returned unchanged.
+ */
+export function toNumber(value: number): number {
+  const raw: unknown = value;
+  if (typeof raw === 'string') {
+    return raw.trim() === '' ? Number.NaN : Number(raw);
+  }
+  return value;
+}
+
 /** Clamp a page size to `[1, MAX_PAGE_SIZE]`; non-finite input gets the default. */
 export function clampLimit(limit: number): number {
-  if (!Number.isFinite(limit)) {
+  const n = toNumber(limit);
+  if (!Number.isFinite(n)) {
     return DEFAULT_PAGE_SIZE;
   }
-  return Math.min(Math.max(1, Math.floor(limit)), MAX_PAGE_SIZE);
+  return Math.min(Math.max(1, Math.floor(n)), MAX_PAGE_SIZE);
 }
 
 /** Clamp a 1-based page number; `0`, negatives and NaN all become page 1. */
 export function clampPage(page: number): number {
-  if (!Number.isFinite(page)) {
+  const n = toNumber(page);
+  if (!Number.isFinite(n)) {
     return 1;
   }
-  return Math.max(1, Math.floor(page));
+  return Math.max(1, Math.floor(n));
 }
 
 /**
@@ -76,10 +90,14 @@ export function serializeCursorValue(value: unknown): string {
  * before any query is sent.
  */
 export function coerceCursor(
-  value: CursorValue | undefined,
+  value: CursorValue | null | undefined,
   type: CursorType,
 ): CursorValue | undefined {
-  if (value === undefined || type === 'string') {
+  // `null` (a last page's `nextCursor`) and `''` (`?cursor=`) mean "no cursor": the first page.
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  if (type === 'string') {
     return value;
   }
   const bad = (): never => {

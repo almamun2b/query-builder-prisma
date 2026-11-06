@@ -914,3 +914,64 @@ describe('QueryBuilder extras', () => {
     expect(recorded.countArgs?.take).toBeUndefined();
   });
 });
+
+describe('QueryBuilder input hardening', () => {
+  it('cursorPaginate treats null and "" as the first page (no cursor sent)', () => {
+    const { delegate } = createFakeDelegate(fakeRows(5));
+    for (const cursor of [null, '']) {
+      const args = new QueryBuilder(delegate).cursorPaginate({ cursor, limit: 2 }).buildArgs();
+      expect(args.cursor).toBeUndefined();
+      expect(args.skip).toBeUndefined();
+      expect(args.take).toBe(3);
+    }
+  });
+
+  it('paginate accepts numeric strings from a query string', () => {
+    const { delegate } = createFakeDelegate(fakeRows(5));
+    const args = new QueryBuilder(delegate)
+      .paginate({ page: '2' as unknown as number, limit: '5' as unknown as number })
+      .buildArgs();
+    expect(args.skip).toBe(5);
+    expect(args.take).toBe(5);
+  });
+
+  it('strictNumbers validates numeric strings instead of rejecting them', () => {
+    const { delegate } = createFakeDelegate(fakeRows(5));
+    const qb = new QueryBuilder(delegate, { strictNumbers: true });
+    expect(() => qb.paginate({ page: '2' as unknown as number })).not.toThrow();
+    expect(() => qb.paginate({ limit: '5000' as unknown as number })).toThrow('strictNumbers');
+    expect(() => qb.paginate({ page: 'abc' as unknown as number })).toThrow('strictNumbers');
+  });
+
+  it('range skips nullish bounds', () => {
+    const { delegate } = createFakeDelegate(fakeRows(5));
+    const args = new QueryBuilder(delegate)
+      .range({
+        a: undefined as unknown as { from?: number },
+        b: null as unknown as { from?: number },
+        c: { from: 1 },
+      })
+      .buildArgs();
+    expect(args.where).toEqual({ c: { gte: 1 } });
+  });
+
+  it('search throws a clear error for a non-string searchText (never drops the filter)', () => {
+    const { delegate } = createFakeDelegate(fakeRows(5));
+    const qb = new QueryBuilder(delegate);
+    expect(() =>
+      qb.search({ searchText: ['a', 'b'] as unknown as string, fields: ['email'] }),
+    ).toThrow('searchText must be a string, got an array');
+    expect(() => qb.search({ searchText: 5 as unknown as string, fields: ['email'] })).toThrow(
+      'got number',
+    );
+  });
+
+  it('filter and where treat nullish input as a no-op', () => {
+    const { delegate } = createFakeDelegate(fakeRows(5));
+    const args = new QueryBuilder(delegate)
+      .filter(null as unknown as Record<string, never>)
+      .where(undefined as unknown as Record<string, never>)
+      .buildArgs();
+    expect(args.where).toBeUndefined();
+  });
+});

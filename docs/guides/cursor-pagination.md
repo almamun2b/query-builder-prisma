@@ -81,7 +81,7 @@ const page1 = await feed.executeWithCursor();
 // Next page — hand meta.nextCursor back to the client, receive it again
 const page2 = await new QueryBuilder(prisma.post)
   .sortBy({ sortBy: 'createdAt', sortOrder: 'desc' })
-  .cursorPaginate({ cursor: page1.meta.nextCursor!, limit: 20 })
+  .cursorPaginate({ cursor: page1.meta.nextCursor, limit: 20 })
   .executeWithCursor();
 
 // Previous page — same cursor, other direction
