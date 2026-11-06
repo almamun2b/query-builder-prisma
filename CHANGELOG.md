@@ -5,8 +5,6 @@ Notable changes to `query-builder-prisma`. Format follows
 over the public surface (`src/index.ts` exports) plus the README behavior
 contracts.
 
-## [Unreleased]
-
 ## [0.3.1] — 2026-11-06
 
 ### Fixed
